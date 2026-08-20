@@ -124,6 +124,12 @@ class DivarListingProvider(ListingProvider):
                 if score: values[title.get_text(" ", strip=True)] = score.get_text(" ", strip=True)
             listing.chassis_condition = values.get("وضعیت شاسی‌ها", "")
             listing.body_condition = values.get("بدنه", listing.body_condition)
+            for heading in soup.select("h1, h2, h3, .kt-title-row__title"):
+                if heading.get_text(" ", strip=True) == "توضیحات":
+                    description = heading.find_next("p", class_="kt-description-row__text")
+                    if description:
+                        listing.description = description.get_text("\n", strip=True)
+                        break
             image_urls = []
             for image in soup.select("img"):
                 url = image.get("src") or image.get("data-src") or ""

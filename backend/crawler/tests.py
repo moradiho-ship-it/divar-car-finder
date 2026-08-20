@@ -44,10 +44,11 @@ def test_divar_html_card_extracts_vehicle_values():
 
 def test_divar_detail_extracts_chassis_and_body():
     class Response:
-        text = '<div class="kt-base-row"><p class="kt-score-row__title">وضعیت شاسی‌ها</p><div class="kt-score-row__score">سالم و پلمپ</div></div><div class="kt-base-row"><p class="kt-score-row__title">بدنه</p><div class="kt-score-row__score">سالم و بی‌خط و خش</div></div>'
+        text = '<div class="kt-base-row"><p class="kt-score-row__title">وضعیت شاسی‌ها</p><div class="kt-score-row__score">سالم و پلمپ</div></div><div class="kt-base-row"><p class="kt-score-row__title">بدنه</p><div class="kt-score-row__score">سالم و بی‌خط و خش</div></div><h2 class="kt-title-row__title">توضیحات</h2><div><p class="kt-description-row__text">خودرو کاملاً سالم است.\nسند تک‌برگ.</p></div>'
         def raise_for_status(self): pass
     class Client:
         def get(self, url): return Response()
     listing = DivarListingProvider(Client()).enrich(NormalizedListing("x", "car", "https://divar.ir/v/-/x"))
     assert listing.chassis_condition == "سالم و پلمپ"
     assert listing.body_condition == "سالم و بی‌خط و خش"
+    assert listing.description == "خودرو کاملاً سالم است.\nسند تک‌برگ."
