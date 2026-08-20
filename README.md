@@ -9,7 +9,7 @@
 - سلامت سرویس: <https://divar-car-finder-api.onrender.com/api/health/>
 
 API روی Render Free، رابط روی Cloudflare Pages، دیتابیس روی Supabase و اجرای
-ساعتی crawler روی Cloudflare Workers قرار دارد.
+ساعتی crawler روی Supabase Edge Functions و Supabase Cron قرار دارد.
 
 ## معماری
 
@@ -101,4 +101,6 @@ docker compose exec backend python manage.py createsuperuser
 
 backend، worker و beat را از یک image روی Railway/Render/Fly/VPS اجرا کنید؛ Redis مدیریت‌شده و Supabase PostgreSQL را متصل کنید. frontend مستقل روی CDN یا image nginx قابل استقرار است. migration را به‌عنوان release command اجرا کنید. برای observability لاگ‌ها JSON-like و دارای شناسه run/profile/listing هستند؛ secretها log نمی‌شوند.
 
-برای استقرار کاملاً رایگان بدون worker دائمی، راهنمای [DEPLOY_FREE.md](DEPLOY_FREE.md) را ببینید: Koyeb برای API، Cloudflare Pages برای رابط، Supabase برای دیتابیس و GitHub Actions برای اجرای ساعتی crawler. در این حالت `crawl_due --sync` از lock دیتابیس استفاده می‌کند و Redis لازم نیست.
+در استقرار رایگان، Supabase Cron در دقیقه ۱۷ هر ساعت Edge Function به نام
+`trigger-crawl` را اجرا می‌کند. این تابع endpoint محافظت‌شده Render را صدا می‌زند؛
+`crawl_due --sync` و lock دیتابیس نیز جایگزین worker دائمی و Redis هستند.

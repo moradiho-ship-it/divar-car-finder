@@ -1,9 +1,0 @@
-name = "divar-car-finder-cron"
-main = "src/index.js"
-compatibility_date = "2026-08-20"
-
-[triggers]
-crons = ["17 * * * *"]
-
-[vars]
-BACKEND_URL = "https://divar-car-finder-api.onrender.com"

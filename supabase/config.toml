@@ -1,0 +1,5 @@
+project_id = "fypqnukqbxgnmpzojbna"
+
+[functions.trigger-crawl]
+verify_jwt = false
+

@@ -1,7 +1,7 @@
-# Free deployment: Supabase + Koyeb + Cloudflare Pages + GitHub Actions
+# Free deployment: Supabase + Render + Cloudflare Pages
 
-> Current live deployment uses Render for the API and a Cloudflare Cron Trigger
-> instead of Koyeb/GitHub Actions. Public URLs are listed in the main README.
+> Current live deployment uses Render for the API, Cloudflare Pages for the UI,
+> and Supabase Edge Functions plus Supabase Cron for hourly crawling.
 
 ## 1. Supabase database
 
