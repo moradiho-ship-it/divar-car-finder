@@ -1,5 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
 import { Controller, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
@@ -77,6 +78,15 @@ const defaults: Form = {
   minimum_match_score: 70,
   crawl_interval_minutes: 60,
 };
+type ApiValidationErrors = Record<string, string | string[]>;
+
+function validationMessages(error: unknown) {
+  const payload = (error as AxiosError<ApiValidationErrors>)?.response?.data;
+  if (!payload || typeof payload !== "object") return [];
+  return Object.values(payload).flatMap((message) =>
+    Array.isArray(message) ? message : [String(message)],
+  );
+}
 export default function SearchFormPage() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -87,6 +97,7 @@ export default function SearchFormPage() {
     control,
     watch,
     setValue,
+    setError,
     formState: { errors },
   } = useForm<Form>({ resolver: zodResolver(schema), defaultValues: defaults });
   const brand = watch("brand"),
@@ -129,6 +140,17 @@ export default function SearchFormPage() {
         : api.post("/searches/", payload);
     },
     onSuccess: () => nav("/searches"),
+    onError: (error: AxiosError<ApiValidationErrors>) => {
+      const payload = error.response?.data;
+      if (!payload || typeof payload !== "object") return;
+      Object.entries(payload).forEach(([name, message]) => {
+        if (!(name in defaults)) return;
+        setError(name as keyof Form, {
+          type: "server",
+          message: Array.isArray(message) ? message.join(" ") : String(message),
+        });
+      });
+    },
   });
   const Field = ({
     name,
@@ -244,6 +266,11 @@ export default function SearchFormPage() {
                 />
               )}
             />
+            {errors.min_year && (
+              <small className="mt-1 block text-red-600">
+                {errors.min_year.message}
+              </small>
+            )}
           </label>
           <label>
             <span className="label">حداکثر سال</span>
@@ -258,6 +285,11 @@ export default function SearchFormPage() {
                 />
               )}
             />
+            {errors.max_year && (
+              <small className="mt-1 block text-red-600">
+                {errors.max_year.message}
+              </small>
+            )}
           </label>
         </div>
       </section>
@@ -432,7 +464,16 @@ export default function SearchFormPage() {
       </section>
       {save.isError && (
         <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
-          ذخیره انجام نشد. ورودی‌ها را بررسی کنید.
+          <p className="font-semibold">ذخیره انجام نشد:</p>
+          {validationMessages(save.error).length ? (
+            <ul className="mt-2 list-inside list-disc space-y-1">
+              {validationMessages(save.error).map((message, index) => (
+                <li key={`${message}-${index}`}>{message}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2">ورودی‌ها را بررسی کنید و دوباره تلاش کنید.</p>
+          )}
         </div>
       )}
       <div className="flex justify-end gap-3">
