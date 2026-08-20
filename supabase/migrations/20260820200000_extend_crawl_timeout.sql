@@ -1,8 +1,3 @@
-create extension if not exists pg_cron with schema pg_catalog;
-create extension if not exists pg_net with schema extensions;
-
--- The three Vault values referenced below are provisioned during deployment:
--- edge_function_url, supabase_publishable_key, crawl_schedule_secret.
 do $$
 begin
   if exists (select 1 from cron.job where jobname = 'divar-car-finder-hourly') then

@@ -2,7 +2,7 @@ import pytest
 from accounts.models import User
 from searches.models import SearchProfile
 from .matching import match_listing
-from .divar import DivarURLBuilder
+from .divar import DivarParser, DivarURLBuilder
 from .types import NormalizedListing
 @pytest.mark.django_db
 def test_hard_ranges_and_keywords_match():
@@ -26,3 +26,18 @@ def test_divar_url_uses_city_slug():
     url = DivarURLBuilder().build(P())
     assert url.startswith("https://divar.ir/s/tehran/car?")
     assert "%D8%AA%D9%87%D8%B1%D8%A7%D9%86" not in url
+
+def test_divar_parser_extracts_card_fields():
+    payload = {"token": "abc", "title": "رنو ساندرو اتوماتیک ۱۳۹۷", "middle_description_text": "۱,۸۰۰,۰۰۰,۰۰۰ تومان", "top_description_text": "۸۵,۰۰۰ کیلومتر", "action": {"payload": {"web_info": {"city_persian": "تهران", "district_persian": "پونک"}}}}
+    listing = DivarParser()._walk_json(payload)[0]
+    assert listing.price == 1_800_000_000
+    assert listing.year == 1397
+    assert listing.mileage == 85_000
+    assert listing.city == "تهران" and listing.district == "پونک"
+
+def test_divar_html_card_extracts_vehicle_values():
+    html = '<a href="/v/test/abc"><h2>ساندرو اتومات ۹۷</h2><span>۱۲۸,۰۰۰ کیلومتر</span><span>۲,۳۰۰,۰۰۰,۰۰۰ تومان</span></a>'
+    listing = DivarParser().parse(html)[0]
+    assert listing.price == 2_300_000_000
+    assert listing.year == 1397
+    assert listing.mileage == 128_000
