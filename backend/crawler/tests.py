@@ -2,7 +2,7 @@ import pytest
 from accounts.models import User
 from searches.models import SearchProfile
 from .matching import match_listing
-from .divar import DivarParser, DivarURLBuilder
+from .divar import DivarListingProvider, DivarParser, DivarURLBuilder
 from .types import NormalizedListing
 @pytest.mark.django_db
 def test_hard_ranges_and_keywords_match():
@@ -41,3 +41,13 @@ def test_divar_html_card_extracts_vehicle_values():
     assert listing.price == 2_300_000_000
     assert listing.year == 1397
     assert listing.mileage == 128_000
+
+def test_divar_detail_extracts_chassis_and_body():
+    class Response:
+        text = '<div class="kt-base-row"><p class="kt-score-row__title">وضعیت شاسی‌ها</p><div class="kt-score-row__score">سالم و پلمپ</div></div><div class="kt-base-row"><p class="kt-score-row__title">بدنه</p><div class="kt-score-row__score">سالم و بی‌خط و خش</div></div>'
+        def raise_for_status(self): pass
+    class Client:
+        def get(self, url): return Response()
+    listing = DivarListingProvider(Client()).enrich(NormalizedListing("x", "car", "https://divar.ir/v/-/x"))
+    assert listing.chassis_condition == "سالم و پلمپ"
+    assert listing.body_condition == "سالم و بی‌خط و خش"

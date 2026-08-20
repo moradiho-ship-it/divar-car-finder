@@ -25,6 +25,11 @@ def execute_crawl(profile, provider, run=None):
         for item in normalized:
             result = match_listing(profile, item)
             if not result.matched: continue
+            enrich = getattr(provider, "enrich", None)
+            if enrich:
+                item = enrich(item)
+                result = match_listing(profile, item)
+                if not result.matched: continue
             match_count += 1
             with transaction.atomic():
                 listing, _ = Listing.objects.update_or_create(provider=provider.name, external_id=item.external_id, defaults=item.model_defaults())

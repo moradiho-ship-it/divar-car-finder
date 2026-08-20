@@ -19,6 +19,7 @@ class Listing(models.Model):
     color = models.CharField(max_length=40, blank=True)
     transmission = models.CharField(max_length=30, blank=True)
     body_condition = models.CharField(max_length=80, blank=True)
+    chassis_condition = models.CharField(max_length=80, blank=True)
     city = models.CharField(max_length=80, blank=True)
     district = models.CharField(max_length=120, blank=True)
     seller_type = models.CharField(max_length=60, blank=True)
@@ -42,4 +43,3 @@ class SearchMatch(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=("search_profile", "listing"), name="unique_search_listing_match")]
         ordering = ["-detected_at"]
-

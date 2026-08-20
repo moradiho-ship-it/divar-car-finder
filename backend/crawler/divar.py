@@ -110,3 +110,20 @@ class DivarListingProvider(ListingProvider):
                 if attempt == 2: raise
                 logger.warning("provider_retry attempt=%s error=%s", attempt + 1, type(exc).__name__); time.sleep(2 ** attempt)
         return []
+
+    def enrich(self, listing: NormalizedListing) -> NormalizedListing:
+        """Load fields that Divar only exposes on the individual post page."""
+        try:
+            response = self.client.get(listing.url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            values = {}
+            for title in soup.select(".kt-score-row__title"):
+                row = title.find_parent(class_="kt-base-row")
+                score = row.select_one(".kt-score-row__score") if row else None
+                if score: values[title.get_text(" ", strip=True)] = score.get_text(" ", strip=True)
+            listing.chassis_condition = values.get("وضعیت شاسی‌ها", "")
+            listing.body_condition = values.get("بدنه", listing.body_condition)
+        except httpx.HTTPError as exc:
+            logger.warning("detail_enrichment_failed token=%s error=%s", listing.external_id, type(exc).__name__)
+        return listing

@@ -20,6 +20,8 @@ class TelegramService:
         if listing.mileage is not None: lines.append(f"🛣 کارکرد: {fa_number(listing.mileage)} کیلومتر")
         if listing.color: lines.append(f"🎨 رنگ: {listing.color}")
         if listing.transmission: lines.append(f"⚙️ گیربکس: {listing.transmission}")
+        lines.append(f"🛡 وضعیت شاسی‌ها: {listing.chassis_condition or 'ذکر نشده'}")
+        lines.append(f"🚘 بدنه: {listing.body_condition or 'ذکر نشده'}")
         if listing.city: lines.append(f"📍 {listing.city}{'، ' + listing.district if listing.district else ''}")
         lines.extend(["", f"🎯 امتیاز تطابق: {fa_number(match.match_score)}٪"])
         message_text = "\n".join(lines)

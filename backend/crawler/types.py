@@ -20,9 +20,9 @@ class NormalizedListing:
     color: str = ""
     transmission: str = ""
     body_condition: str = ""
+    chassis_condition: str = ""
     seller_type: str = ""
     published_at: Optional[datetime] = None
     raw_data: dict[str, Any] = field(default_factory=dict)
     def model_defaults(self):
         data = asdict(self); data.pop("external_id"); data["canonical_url"] = self.url.split("?")[0]; return data
-
