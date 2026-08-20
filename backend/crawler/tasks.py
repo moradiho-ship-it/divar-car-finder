@@ -25,7 +25,8 @@ def crawl_profile(self, profile_id):
             logger.warning("redis_unavailable_using_database_lock search_profile_id=%s", profile_id)
             lock = None
     try:
-        run = execute_crawl(profile, DivarListingProvider(), run=run); return {"status": run.status, "run_id": run.id}
+        run = execute_crawl(profile, DivarListingProvider(), run=run)
+        return {"status": run.status, "run_id": run.id, "error_message": run.error_message}
     finally:
         if lock:
             try: lock.release()

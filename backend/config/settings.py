@@ -49,7 +49,9 @@ REST_FRAMEWORK = {
 }
 SIMPLE_JWT = {"ACCESS_TOKEN_LIFETIME": timedelta(minutes=30), "REFRESH_TOKEN_LIFETIME": timedelta(days=7), "ROTATE_REFRESH_TOKENS": True}
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-CELERY_BROKER_URL = CELERY_RESULT_BACKEND = REDIS_URL or "memory://"
+CELERY_BROKER_URL = REDIS_URL or "memory://"
+CELERY_RESULT_BACKEND = REDIS_URL or "cache+memory://"
+CELERY_TASK_IGNORE_RESULT = True
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() == "true"
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BEAT_SCHEDULE = {"enqueue-due-searches": {"task": "crawler.tasks.enqueue_due_searches", "schedule": 60.0}}

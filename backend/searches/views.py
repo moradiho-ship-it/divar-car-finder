@@ -16,8 +16,9 @@ class SearchProfileViewSet(viewsets.ModelViewSet):
         from crawler.tasks import crawl_profile
         profile = self.get_object()
         if profile.crawl_runs.filter(status="running").exists(): return Response({"detail": "این جستجو هم‌اکنون در حال بررسی است."}, status=409)
-        result = crawl_profile.delay(profile.id)
-        return Response({"task_id": result.id, "status": "queued"}, status=202)
+        result = crawl_profile.run(profile.id)
+        status_code = 200 if result.get("status") == "success" else 502
+        return Response(result, status=status_code)
     @action(detail=True, methods=["post"])
     def duplicate(self, request, pk=None):
         source = self.get_object(); source.pk = None; source.title = f"کپی {source.title}"; source.save()

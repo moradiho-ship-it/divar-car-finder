@@ -7,10 +7,21 @@ from .providers import ListingProvider
 from .types import NormalizedListing
 logger = logging.getLogger(__name__)
 
+DIVAR_CITY_SLUGS = {
+    "تهران": "tehran", "کرج": "karaj", "مشهد": "mashhad", "اصفهان": "isfahan",
+    "شیراز": "shiraz", "تبریز": "tabriz", "قم": "qom", "اهواز": "ahvaz",
+    "رشت": "rasht", "ارومیه": "urmia", "کرمان": "kerman", "یزد": "yazd",
+    "قزوین": "qazvin", "همدان": "hamedan", "ساری": "sari", "گرگان": "gorgan",
+    "بندرعباس": "bandar-abbas", "اراک": "arak", "زنجان": "zanjan",
+    "اردبیل": "ardabil", "سنندج": "sanandaj", "کرمانشاه": "kermanshah",
+    "بوشهر": "bushehr", "خرم‌آباد": "khorramabad", "کاشان": "kashan",
+}
+
 class DivarURLBuilder:
     BASE = "https://divar.ir/s/{city}/car"
     def build(self, profile: SearchProfile) -> str:
-        city = (profile.cities or ["tehran"])[0]
+        selected_city = (profile.cities or ["تهران"])[0].strip()
+        city = DIVAR_CITY_SLUGS.get(selected_city, selected_city.lower())
         params = {"q": " ".join(x for x in (profile.brand, profile.model, profile.trim) if x)}
         if profile.min_price is not None: params["price"] = f"{profile.min_price}-"
         if profile.max_price is not None: params["price"] = f"{profile.min_price or 0}-{profile.max_price}"
@@ -65,4 +76,3 @@ class DivarListingProvider(ListingProvider):
                 if attempt == 2: raise
                 logger.warning("provider_retry attempt=%s error=%s", attempt + 1, type(exc).__name__); time.sleep(2 ** attempt)
         return []
-
