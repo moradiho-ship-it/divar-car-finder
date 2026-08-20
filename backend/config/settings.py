@@ -51,6 +51,7 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BEAT_SCHEDULE = {"enqueue-due-searches": {"task": "crawler.tasks.enqueue_due_searches", "schedule": 60.0}}
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
+CRON_SECRET = os.getenv("CRON_SECRET", "")
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = not DEBUG
 LOGGING = {"version": 1, "disable_existing_loggers": False, "formatters": {"json": {"format": '{{"time":"{asctime}","level":"{levelname}","event":"{message}"}}', "style": "{"}}, "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}}, "root": {"handlers": ["console"], "level": "INFO"}, "loggers": {"httpx": {"handlers": ["console"], "level": "WARNING", "propagate": False}, "httpcore": {"handlers": ["console"], "level": "WARNING", "propagate": False}}}

@@ -25,3 +25,15 @@ class DashboardSummaryView(APIView):
             "notifications_sent": Notification.objects.filter(user=request.user, status="sent", sent_at__date=today).count(),
             "latest_matches": [{"id": x.listing_id, "title": x.listing.title, "price": x.listing.price, "year": x.listing.year, "mileage": x.listing.mileage, "city": x.listing.city, "thumbnail_url": x.listing.thumbnail_url, "match_score": x.match_score, "discovered_at": x.detected_at, "url": x.listing.url} for x in latest]})
 
+class ScheduledCrawlView(APIView):
+    """Secret-protected entry point for Cloudflare Cron Triggers."""
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    def post(self, request):
+        import secrets
+        from django.conf import settings
+        if not settings.CRON_SECRET or not secrets.compare_digest(request.headers.get("X-Cron-Secret", ""), settings.CRON_SECRET):
+            return Response({"detail": "Forbidden"}, status=403)
+        from crawler.scheduling import run_due_synchronously
+        ids = run_due_synchronously()
+        return Response({"status": "ok", "profiles_crawled": len(ids)})
