@@ -1,0 +1,1318 @@
+# Build a Production-Ready Divar Car Finder with Django, React, Supabase, and Telegram
+
+You are a senior full-stack software engineer and product designer.
+
+I want you to build a complete production-ready web application called **Divar Car Finder**.
+
+The product allows a user to define the exact type of car they are looking for. The system periodically checks Divar for newly published car listings matching those criteria. When a matching listing is discovered, the system stores it and immediately sends a detailed notification through a Telegram bot.
+
+The application must include a highly polished Persian RTL admin dashboard.
+
+Do not only give me an architecture description. Implement the application step by step and create all required source files, migrations, APIs, frontend pages, background jobs, crawler modules, configuration files, Docker files, and documentation.
+
+## 1. Main Product Goal
+
+The user should be able to create one or multiple car search profiles.
+
+Example search:
+
+* Brand: Toyota
+* Model: Camry
+* Minimum year: 2018
+* Maximum year: 2023
+* Minimum price: 1,500,000,000 IRR
+* Maximum price: 3,000,000,000 IRR
+* Maximum mileage: 80,000 km
+* City: Tehran
+* Transmission: Automatic
+* Body condition: No paint
+* Color: White or Black
+
+Every hour, the backend should search Divar.
+
+If a new advertisement matches the user's conditions:
+
+1. Save the listing in the database
+2. Prevent duplicate listings from being inserted
+3. Associate the listing with the matching search profile
+4. Send the listing to the user's Telegram account
+5. Store the Telegram delivery status
+6. Show the listing in the web dashboard
+
+The architecture must allow the crawling frequency to be changed later.
+
+## 2. Preferred Technology Stack
+
+Use this stack unless there is a strong technical reason to use an equivalent lightweight alternative.
+
+### Backend
+
+* Python
+* Django
+* Django REST Framework
+* PostgreSQL hosted on Supabase
+* Celery for background tasks
+* Redis for Celery queue and distributed locks
+* Celery Beat for scheduled crawling
+
+If deploying Celery creates unnecessary complexity for the first version, provide a second lightweight implementation using a scheduled Django management command that can be triggered by cron, GitHub Actions, Supabase Cron, Railway Cron, or another scheduler.
+
+Design the crawling service so switching between these approaches is easy.
+
+### Frontend
+
+* React
+* Vite
+* TypeScript
+* Tailwind CSS
+* shadcn/ui or another high quality lightweight component library
+* React Query or TanStack Query
+* React Router
+* React Hook Form
+* Zod for validation
+
+### Database
+
+Use Supabase PostgreSQL.
+
+Supabase project URL:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://fypqnukqbxgnmpzojbna.supabase.co
+```
+
+Supabase publishable key:
+
+```env
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_uGZA1SQUtjapoIra9eTBDQ_wA3VVr2B
+```
+
+For server-side secrets use environment variables only.
+
+Never hardcode:
+
+* Supabase secret keys
+* Database passwords
+* Telegram bot token
+* Telegram chat IDs
+* Django secret key
+
+Create `.env.example` files with placeholders.
+
+The database connection should be configured using a variable such as:
+
+```env
+DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.fypqnukqbxgnmpzojbna.supabase.co:5432/postgres
+```
+
+## 3. Architecture
+
+Use a clean modular structure.
+
+Suggested backend apps:
+
+```text
+backend/
+  config/
+  accounts/
+  searches/
+  listings/
+  crawler/
+  notifications/
+  dashboard/
+```
+
+Suggested frontend:
+
+```text
+frontend/
+  src/
+    api/
+    components/
+    features/
+      dashboard/
+      searches/
+      listings/
+      telegram/
+      settings/
+    layouts/
+    pages/
+    hooks/
+    lib/
+    types/
+```
+
+Keep Divar-specific logic inside the crawler module.
+
+The rest of the application should not depend directly on Divar HTML structure.
+
+Create interfaces such as:
+
+```python
+class ListingProvider:
+    def search(self, search_profile):
+        ...
+```
+
+Then implement:
+
+```python
+class DivarListingProvider(ListingProvider):
+    ...
+```
+
+This architecture should allow adding other marketplaces later.
+
+## 4. Database Models
+
+Design normalized Django models.
+
+At minimum implement the following entities.
+
+### User
+
+Use Django's user model or a custom user model.
+
+Fields should support:
+
+* email
+* name
+* authentication
+* created_at
+* updated_at
+
+### SearchProfile
+
+Fields:
+
+* id
+* user
+* title
+* is_active
+* brand
+* model
+* trim
+* min_year
+* max_year
+* min_price
+* max_price
+* min_mileage
+* max_mileage
+* cities
+* colors
+* transmission
+* body_condition
+* description_keywords
+* excluded_keywords
+* crawl_interval_minutes
+* last_checked_at
+* created_at
+* updated_at
+
+Use JSON or related tables for filters that allow multiple values.
+
+### Listing
+
+Store all useful data returned from Divar.
+
+Fields should include:
+
+* id
+* provider
+* external_id
+* title
+* description
+* url
+* image_urls
+* thumbnail_url
+* price
+* year
+* mileage
+* brand
+* model
+* trim
+* color
+* transmission
+* body_condition
+* city
+* district
+* seller_type
+* published_at
+* discovered_at
+* raw_data
+* created_at
+* updated_at
+
+Create a database uniqueness constraint using provider and external_id.
+
+### SearchMatch
+
+Fields:
+
+* search_profile
+* listing
+* match_score
+* matched_fields
+* detected_at
+
+Prevent duplicate SearchMatch rows.
+
+### TelegramConnection
+
+Fields:
+
+* user
+* chat_id
+* username
+* is_verified
+* verification_code
+* connected_at
+* created_at
+
+### Notification
+
+Fields:
+
+* user
+* listing
+* search_profile
+* channel
+* status
+* external_message_id
+* sent_at
+* error_message
+* retry_count
+* created_at
+
+### CrawlRun
+
+Fields:
+
+* search_profile
+* started_at
+* finished_at
+* status
+* listings_scanned
+* matches_found
+* new_matches
+* error_message
+* metadata
+
+## 5. Search Profile Creation UX
+
+Create a beautiful form for adding a car search.
+
+The dashboard language must be Persian and RTL.
+
+Example sections:
+
+### Basic vehicle information
+
+* برند
+* مدل
+* تیپ
+* سال ساخت
+
+### Price
+
+* حداقل قیمت
+* حداکثر قیمت
+
+Use properly formatted Persian numbers and price separators.
+
+### Mileage
+
+* حداقل کارکرد
+* حداکثر کارکرد
+
+### Location
+
+* city
+* optional district
+
+Support multi-select.
+
+### Vehicle characteristics
+
+* color
+* transmission
+* body condition
+
+### Keyword filters
+
+The user can enter:
+
+* required keywords
+* excluded keywords
+
+Example:
+
+Required:
+
+```text
+سانروف
+بدون رنگ
+```
+
+Excluded:
+
+```text
+تصادفی
+تعویض اتاق
+```
+
+### Notification settings
+
+* Telegram enabled
+* notify only once per listing
+* minimum match score
+* crawl frequency
+
+The initial default crawl interval should be 60 minutes.
+
+## 6. Matching Engine
+
+Do not rely only on the search URL.
+
+Create a second server-side matching layer.
+
+For every retrieved listing calculate whether it matches the SearchProfile.
+
+Implement a reusable service such as:
+
+```python
+match_listing(search_profile, listing)
+```
+
+Support:
+
+* exact filters
+* ranges
+* multiple allowed values
+* required keywords
+* excluded keywords
+* missing data handling
+
+Return:
+
+```json
+{
+  "matched": true,
+  "score": 92,
+  "matched_fields": {},
+  "failed_fields": []
+}
+```
+
+Use a configurable match score between 0 and 100.
+
+Hard filters such as price limits should normally disqualify a listing.
+
+Soft filters can influence the match score.
+
+Keep this logic independent from the crawler.
+
+## 7. Divar Crawler
+
+Implement the crawler carefully.
+
+Do not tightly couple parsing logic with business logic.
+
+Separate these responsibilities:
+
+```text
+Divar search URL builder
+Divar HTTP client
+Divar search result parser
+Divar listing detail parser
+Listing normalizer
+Matching engine
+Persistence layer
+Notification service
+```
+
+Create a normalized Python data structure for crawler results.
+
+Example:
+
+```python
+@dataclass
+class NormalizedListing:
+    external_id: str
+    title: str
+    url: str
+    price: int | None
+    year: int | None
+    mileage: int | None
+    city: str | None
+    description: str | None
+    image_urls: list[str]
+    raw_data: dict
+```
+
+Use resilient extraction strategies.
+
+Add:
+
+* timeouts
+* retries
+* exponential backoff
+* request throttling
+* reasonable random delays
+* structured logging
+* error handling
+* HTML or payload validation
+* duplicate protection
+* transaction safety
+
+Respect the target service's applicable terms, access rules, rate limits, and robots or technical restrictions.
+
+Do not attempt to bypass CAPTCHAs, authentication controls, anti-bot protections, or other access restrictions.
+
+If Divar provides a public endpoint suitable for retrieving listing information, isolate its usage in the provider adapter.
+
+If the website structure changes, parsing errors must not crash the entire background worker.
+
+Store useful parsing errors for debugging.
+
+## 8. Crawl Workflow
+
+Implement approximately this workflow:
+
+```text
+Scheduler
+    ↓
+Get active search profiles
+    ↓
+Acquire lock for profile
+    ↓
+Generate Divar query
+    ↓
+Fetch result pages
+    ↓
+Extract listings
+    ↓
+Normalize listing
+    ↓
+Check if already processed
+    ↓
+Run matching engine
+    ↓
+Store new listing
+    ↓
+Store SearchMatch
+    ↓
+Send Telegram notification
+    ↓
+Record Notification
+    ↓
+Update CrawlRun
+```
+
+Use Redis or database locking so two workers do not crawl the same profile simultaneously.
+
+## 9. Duplicate Detection
+
+Duplicate notifications must never be sent.
+
+Use several levels of protection.
+
+Primary:
+
+```text
+provider + external_id
+```
+
+Additional safeguards:
+
+* canonical URL
+* SearchMatch unique constraint
+* Notification unique constraint where appropriate
+
+The same listing can match multiple search profiles.
+
+However, avoid sending redundant Telegram notifications to the same user when appropriate.
+
+Implement an intentional deduplication policy and document it.
+
+## 10. Telegram Bot
+
+Implement a Telegram bot integration.
+
+Environment variables:
+
+```env
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_USERNAME=
+```
+
+Never expose the bot token to the frontend.
+
+Create a simple account connection flow.
+
+Recommended approach:
+
+1. User opens Telegram settings in the web dashboard
+2. Website generates a temporary verification token
+3. User opens the Telegram bot using a deep link
+4. Bot receives `/start <token>`
+5. Backend associates the Telegram chat ID with the logged-in web user
+6. Dashboard displays "Connected"
+
+Verification tokens must:
+
+* expire
+* be one-time-use
+* be stored securely
+
+## 11. Telegram Message Design
+
+When a matching car is discovered, send an attractive Persian Telegram message.
+
+Example structure:
+
+```text
+🚗 آگهی جدید مطابق جستجوی شما
+
+Toyota Camry 2021
+
+💰 قیمت: ۲,۸۵۰,۰۰۰,۰۰۰ تومان
+📅 سال: ۲۰۲۱
+🛣 کارکرد: ۴۲,۰۰۰ کیلومتر
+🎨 رنگ: سفید
+⚙️ گیربکس: اتوماتیک
+📍 تهران، سعادت‌آباد
+
+🎯 امتیاز تطابق: ۹۴٪
+
+مشاهده آگهی در دیوار
+```
+
+If possible include the main listing photo.
+
+Use an inline Telegram button:
+
+```text
+مشاهده آگهی
+```
+
+that links to the original Divar advertisement.
+
+The notification should contain available information only.
+
+Missing fields must not produce ugly empty labels.
+
+## 12. Dashboard Design
+
+The frontend should look like a premium SaaS product, not a generic Django admin panel.
+
+Use:
+
+* Persian UI
+* RTL layout
+* modern typography
+* responsive design
+* mobile friendly components
+* subtle shadows
+* generous spacing
+* polished cards
+* empty states
+* skeleton loaders
+* confirmation dialogs
+* toast notifications
+* accessible form elements
+
+Use a Persian compatible font such as Vazirmatn through a normal package or web-safe integration.
+
+Do not commit font binaries to the repository.
+
+## 13. Main Navigation
+
+Create a sidebar containing:
+
+* داشبورد
+* جستجوهای من
+* آگهی‌های پیدا شده
+* اتصال تلگرام
+* تاریخچه بررسی‌ها
+* تنظیمات
+
+## 14. Dashboard Home Page
+
+Create KPI cards:
+
+* جستجوهای فعال
+* آگهی‌های بررسی شده امروز
+* خودروهای منطبق امروز
+* اعلان‌های ارسال شده
+
+Also show:
+
+### Latest matches
+
+Cards with:
+
+* car image
+* title
+* price
+* year
+* mileage
+* location
+* match score
+* discovery time
+* button to open Divar
+
+### Active search profiles
+
+Show each profile with:
+
+* name
+* primary filters
+* active status
+* last check
+* next estimated check
+* number of matches
+
+## 15. Searches Page
+
+Implement:
+
+* search profile cards
+* enable or disable toggle
+* edit
+* delete
+* duplicate
+* run manually
+* view results
+
+Use a prominent button:
+
+```text
++ جستجوی جدید
+```
+
+## 16. Listing Results Page
+
+Allow the user to filter discovered listings by:
+
+* search profile
+* brand
+* model
+* price
+* year
+* mileage
+* city
+* match score
+* date discovered
+
+Allow sorting by:
+
+* newest
+* price ascending
+* price descending
+* lowest mileage
+* newest model year
+* match score
+
+Provide both:
+
+* card view
+* table view
+
+## 17. Listing Details Page
+
+Display:
+
+* gallery
+* title
+* price
+* specifications
+* description
+* Divar location
+* matching search profile
+* match score
+* why this listing matched
+* discovered time
+* Telegram notification status
+
+Add:
+
+```text
+مشاهده در دیوار
+```
+
+button.
+
+## 18. Crawl History
+
+Build a monitoring page showing crawl jobs.
+
+Columns:
+
+* search name
+* start time
+* duration
+* number scanned
+* matches
+* new matches
+* status
+
+Statuses:
+
+* success
+* partial
+* failed
+* running
+
+Add a details drawer with logs and error summaries.
+
+## 19. Manual Crawl
+
+The user should be able to click:
+
+```text
+بررسی الان
+```
+
+from a SearchProfile.
+
+This should enqueue the crawl asynchronously.
+
+Disable repeated clicks while a crawl for that profile is already running.
+
+## 20. Authentication
+
+Implement authentication.
+
+Preferred options:
+
+Option A:
+
+Use Django authentication and JWT or secure HttpOnly cookies.
+
+Option B:
+
+Use Supabase Auth and validate Supabase JWT tokens in Django.
+
+Choose the simpler secure architecture and explain the decision in the README.
+
+The application should initially support one user but the database and APIs must be multi-user capable.
+
+All API resources must be scoped to their owner.
+
+A user must never see another user's:
+
+* search profiles
+* listings
+* crawl results
+* Telegram information
+* notifications
+
+## 21. API Design
+
+Create clean REST endpoints.
+
+Example:
+
+```text
+POST   /api/auth/login/
+POST   /api/auth/logout/
+GET    /api/me/
+
+GET    /api/searches/
+POST   /api/searches/
+GET    /api/searches/:id/
+PATCH  /api/searches/:id/
+DELETE /api/searches/:id/
+POST   /api/searches/:id/run/
+
+GET    /api/listings/
+GET    /api/listings/:id/
+
+GET    /api/crawl-runs/
+GET    /api/crawl-runs/:id/
+
+GET    /api/dashboard/summary/
+
+GET    /api/telegram/status/
+POST   /api/telegram/connect/
+DELETE /api/telegram/disconnect/
+```
+
+Add pagination, filtering, ordering, and validation.
+
+## 22. Backend Admin
+
+Also configure Django Admin for operational debugging.
+
+Register:
+
+* Users
+* SearchProfiles
+* Listings
+* SearchMatches
+* CrawlRuns
+* Notifications
+* TelegramConnections
+
+The Django admin is for internal debugging only.
+
+The primary interface is the custom React dashboard.
+
+## 23. Security
+
+Follow secure defaults.
+
+Implement:
+
+* CSRF protection when appropriate
+* secure cookies
+* CORS configuration
+* authentication
+* authorization
+* object ownership checks
+* environment secret management
+* server-side validation
+* rate limiting for manual crawling
+* input sanitization
+* protection against duplicate job execution
+
+Do not place server secrets in frontend environment variables.
+
+Any variable starting with `VITE_` or `NEXT_PUBLIC_` must be treated as publicly visible.
+
+## 24. Logging and Observability
+
+Use structured logging.
+
+Important events:
+
+```text
+crawl_started
+crawl_finished
+crawl_failed
+listing_discovered
+listing_matched
+listing_duplicate
+telegram_sent
+telegram_failed
+parser_failed
+```
+
+Include identifiers such as:
+
+* search_profile_id
+* listing_id
+* external_id
+* crawl_run_id
+
+Never log secret keys or Telegram tokens.
+
+## 25. Tests
+
+Write meaningful automated tests.
+
+Backend:
+
+* model tests
+* matching engine tests
+* crawler parser tests using saved fixtures
+* API permission tests
+* deduplication tests
+* Telegram notification tests using mocks
+* scheduled crawl tests
+
+Frontend:
+
+* key form validation
+* search profile creation
+* filters
+* empty states
+
+Crawler tests must not depend on live Divar requests.
+
+Create sanitized fixtures.
+
+## 26. Development Experience
+
+Provide Docker Compose with:
+
+* backend
+* frontend
+* redis
+
+Supabase PostgreSQL can remain external.
+
+Also support running services directly without Docker.
+
+Commands should be simple.
+
+Example:
+
+Backend:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Worker:
+
+```bash
+celery -A config worker -l info
+```
+
+Scheduler:
+
+```bash
+celery -A config beat -l info
+```
+
+## 27. Environment Configuration
+
+Create:
+
+```text
+backend/.env.example
+frontend/.env.example
+```
+
+Example backend variables:
+
+```env
+DEBUG=true
+SECRET_KEY=
+DATABASE_URL=
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:5173
+
+REDIS_URL=redis://localhost:6379/0
+
+SUPABASE_URL=https://fypqnukqbxgnmpzojbna.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_uGZA1SQUtjapoIra9eTBDQ_wA3VVr2B
+SUPABASE_SECRET_KEY=
+
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_USERNAME=
+```
+
+Example frontend:
+
+```env
+VITE_API_URL=http://localhost:8000/api
+VITE_SUPABASE_URL=https://fypqnukqbxgnmpzojbna.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_uGZA1SQUtjapoIra9eTBDQ_wA3VVr2B
+```
+
+Do not require the frontend to know `SUPABASE_SECRET_KEY`.
+
+## 28. Database Migrations
+
+Generate all Django migrations necessary for the schema.
+
+Add useful indexes for:
+
+* Listing external_id
+* Listing discovered_at
+* Listing price
+* Listing year
+* SearchProfile is_active
+* CrawlRun started_at
+* Notification status
+
+Consider PostgreSQL JSONB for raw listing payloads and matched field metadata.
+
+## 29. Performance
+
+Avoid fetching full listing details unnecessarily.
+
+Suggested workflow:
+
+1. Retrieve Divar search results
+2. Extract lightweight listing information
+3. Detect known external IDs
+4. Skip already processed advertisements when possible
+5. Fetch detailed information only when required
+6. Apply filters
+7. Persist and notify
+
+Prevent N+1 database queries.
+
+Use bulk operations where appropriate.
+
+## 30. Persian Localization
+
+The UI should use natural Persian labels.
+
+Dates should display in a user friendly Persian format.
+
+Numbers may use Persian digits in presentation while APIs and database values remain standard numeric values.
+
+Price formatting must be consistent.
+
+Make it easy to change between:
+
+```text
+تومان
+ریال
+```
+
+Use `fa-IR` locale where appropriate.
+
+## 31. UX Details
+
+Make the experience highly polished.
+
+Include:
+
+* onboarding
+* first search wizard
+* Telegram connection status
+* clear crawler state
+* last crawl timestamp
+* next scheduled crawl
+* helpful validation
+* retry states
+* informative empty screens
+* loading skeletons
+* error boundaries
+
+When the user has no SearchProfile, show a strong empty state inviting them to create their first search.
+
+## 32. Responsive Design
+
+The product must work well on:
+
+* Desktop
+* Tablet
+* Mobile
+
+Desktop should use a sidebar.
+
+Mobile should use an appropriate responsive navigation pattern.
+
+## 33. README
+
+Create a comprehensive `README.md`.
+
+Explain:
+
+1. Product architecture
+2. Directory structure
+3. Local setup
+4. Supabase setup
+5. PostgreSQL connection
+6. Environment variables
+7. Telegram BotFather setup
+8. Telegram connection flow
+9. Running Django
+10. Running React
+11. Running Redis
+12. Running Celery
+13. Running Celery Beat
+14. Running migrations
+15. Creating an admin user
+16. Running tests
+17. Running a crawl manually
+18. Deployment considerations
+19. Security considerations
+20. How to update the Divar parser if Divar changes
+
+## 34. Deployment
+
+Prepare the project so it can easily be deployed using services such as:
+
+* Railway
+* Render
+* Fly.io
+* VPS
+* Docker
+
+Frontend can also be deployed independently.
+
+Do not assume serverless-only execution because crawler jobs may require background workers.
+
+Provide:
+
+* Dockerfiles
+* docker-compose.yml
+* production environment example
+* health check endpoint
+
+Implement:
+
+```text
+GET /api/health/
+```
+
+## 35. Development Strategy
+
+Build the project incrementally.
+
+Follow this order.
+
+### Phase 1
+
+Create repository structure and configuration.
+
+### Phase 2
+
+Create Django models and migrations.
+
+### Phase 3
+
+Create APIs and authentication.
+
+### Phase 4
+
+Create the React dashboard shell and design system.
+
+### Phase 5
+
+Create search profile CRUD.
+
+### Phase 6
+
+Create matching engine.
+
+### Phase 7
+
+Create Divar provider and crawler.
+
+### Phase 8
+
+Create scheduled jobs.
+
+### Phase 9
+
+Create Telegram integration.
+
+### Phase 10
+
+Create dashboard analytics and crawl history.
+
+### Phase 11
+
+Add tests.
+
+### Phase 12
+
+Dockerize and write documentation.
+
+After each phase, run relevant tests and fix errors before continuing.
+
+## 36. Important Coding Instructions
+
+Do not return placeholder pseudo-code unless a piece truly cannot be implemented without external credentials.
+
+Write complete files.
+
+Use:
+
+* type hints in Python
+* TypeScript types
+* service layers
+* reusable components
+* clean naming
+* migrations
+* validation
+* automated tests
+
+Avoid unnecessarily complicated abstractions.
+
+Prefer maintainable production code over clever code.
+
+Do not put the entire crawler in one file.
+
+Do not put all frontend components in one page.
+
+Do not tightly couple Telegram sending with crawler parsing.
+
+## 37. Data Safety
+
+Do not delete existing Supabase tables or data.
+
+Before applying destructive migrations, explicitly identify the operation.
+
+Never run:
+
+```text
+DROP DATABASE
+DROP SCHEMA
+```
+
+Do not expose secret environment variables in logs.
+
+## 38. Existing Supabase Configuration
+
+The Supabase project reference is:
+
+```text
+fypqnukqbxgnmpzojbna
+```
+
+The Supabase URL is:
+
+```text
+https://fypqnukqbxgnmpzojbna.supabase.co
+```
+
+Use the supplied publishable key where appropriate.
+
+I will manually provide these private values through environment variables:
+
+```env
+DATABASE_URL=
+SUPABASE_SECRET_KEY=
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_USERNAME=
+```
+
+Do not ask me to paste private secrets into source code.
+
+## 39. Definition of Done
+
+The MVP is complete when I can:
+
+1. Start backend, frontend, Redis, worker, and scheduler
+2. Log into the dashboard
+3. Create a car search profile
+4. Specify price, year, mileage, location, and vehicle attributes
+5. Connect my Telegram account
+6. Click "بررسی الان" and trigger a crawl
+7. See discovered listings in the dashboard
+8. Receive a Telegram message for a new matching listing
+9. Leave the system running
+10. Have the system automatically check active searches approximately every hour
+11. Never receive duplicate notifications for the same match
+12. View crawler errors and history from the dashboard
+
+## 40. Start Now
+
+First inspect the existing repository.
+
+Do not overwrite working code unnecessarily.
+
+Then:
+
+1. Show the proposed final repository structure
+2. Identify the implementation plan
+3. Start implementing Phase 1 immediately
+4. Continue through the phases without stopping at architecture discussion
+5. Run tests and linters as you progress
+6. Fix errors you encounter
+7. At the end provide the exact commands I should run locally
+
+When making an implementation decision, choose a sensible production-ready default and continue instead of repeatedly asking for confirmation.

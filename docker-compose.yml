@@ -1,0 +1,27 @@
+services:
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2
+    ports: ["8000:8000"]
+    depends_on: [redis]
+  worker:
+    build: ./backend
+    env_file: ./backend/.env
+    command: celery -A config worker -l info
+    depends_on: [redis]
+  beat:
+    build: ./backend
+    env_file: ./backend/.env
+    command: celery -A config beat -l info
+    depends_on: [redis]
+  frontend:
+    build: {context: ./frontend, args: {VITE_API_URL: http://localhost:8000/api}}
+    ports: ["5173:80"]
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes: ["redis-data:/data"]
+    ports: ["6379:6379"]
+volumes: {redis-data: {}}
+

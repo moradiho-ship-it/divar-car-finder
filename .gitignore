@@ -1,0 +1,13 @@
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+backend/.venv/
+.venv/
+celerybeat-schedule*
+*.tsbuildinfo
+backend/db.sqlite3
+backend/staticfiles/
+frontend/node_modules/
+frontend/dist/
+.DS_Store
