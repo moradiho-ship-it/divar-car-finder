@@ -1,5 +1,8 @@
 # Free deployment: Supabase + Koyeb + Cloudflare Pages + GitHub Actions
 
+> Current live deployment uses Render for the API and a Cloudflare Cron Trigger
+> instead of Koyeb/GitHub Actions. Public URLs are listed in the main README.
+
 ## 1. Supabase database
 
 Copy the **Session pooler** connection string from Supabase Dashboard → Connect.
@@ -59,4 +62,3 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://YOUR-APP.koyeb.ap
 ```
 
 Do this privately; never paste the complete URL into logs or source control.
-

@@ -2,6 +2,15 @@
 
 یک داشبورد فارسی RTL برای تعریف جستجوی خودرو، بررسی دوره‌ای آگهی‌های دیوار، تطبیق سمت سرور و اعلان بدون تکرار در تلگرام.
 
+## نسخه آنلاین
+
+- داشبورد: <https://divar-car-finder.pages.dev>
+- API: <https://divar-car-finder-api.onrender.com/api/>
+- سلامت سرویس: <https://divar-car-finder-api.onrender.com/api/health/>
+
+API روی Render Free، رابط روی Cloudflare Pages، دیتابیس روی Supabase و اجرای
+ساعتی crawler روی Cloudflare Workers قرار دارد.
+
 ## معماری
 
 - `backend/`: Django 4.2، DRF، JWT، PostgreSQL/Supabase، Celery و Redis
