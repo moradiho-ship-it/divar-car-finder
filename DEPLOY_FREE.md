@@ -28,7 +28,7 @@ supabase link --project-ref YOUR_PROJECT_REF
 supabase db push --linked --include-all
 ```
 
-The migration schedules `divar-car-finder-hourly` at minute 17 of every hour. `pg_net` uses a 60-second timeout so a sleeping Render service has time to wake up.
+The migration schedules `divar-car-finder-hourly` at the start of every hour in Tehran (`30 * * * *` in UTC). `pg_net` uses a 60-second timeout so a sleeping Render service has time to wake up.
 
 ## 2. Django API on Render
 

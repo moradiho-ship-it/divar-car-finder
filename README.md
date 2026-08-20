@@ -37,7 +37,7 @@ Browser
             ├─ Divar listing/detail pages
             └─ Telegram Bot API
 
-Supabase pg_cron (minute 17 of every hour)
+Supabase pg_cron (at the start of every hour in Tehran; minute 30 UTC)
   └─ Supabase Edge Function: trigger-crawl
        └─ protected Django crawl-due endpoint
 ```
