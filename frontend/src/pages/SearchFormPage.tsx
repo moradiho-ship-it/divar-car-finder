@@ -1,7 +1,448 @@
-import {zodResolver} from '@hookform/resolvers/zod'; import {useMutation,useQuery} from '@tanstack/react-query'; import {Controller,useForm} from 'react-hook-form'; import {useNavigate,useParams} from 'react-router-dom'; import {z} from 'zod'; import {api} from '../api/client'; import type {SearchProfile} from '../types';
-import {Autocomplete,MultiAutocomplete} from '../components/Autocomplete';
-import {BODY_CONDITIONS,BRAND_OPTIONS,CITIES,COLORS,MILEAGE_SUGGESTIONS,MODELS_BY_BRAND,PRICE_SUGGESTIONS,TEHRAN_DISTRICTS,TRANSMISSIONS,TRIMS_BY_MODEL,YEARS} from '../data/vehicleOptions';
-const optionalNumber=z.preprocess(v=>v===''?null:Number(v),z.number().nonnegative().nullable());
-const schema=z.object({title:z.string().min(2,'نام جستجو را وارد کنید'),brand:z.string(),model:z.string(),trim:z.string(),min_year:optionalNumber,max_year:optionalNumber,min_price:optionalNumber,max_price:optionalNumber,min_mileage:optionalNumber,max_mileage:optionalNumber,cities:z.array(z.string()),districts:z.array(z.string()),colors:z.array(z.string()),transmission:z.string(),body_condition:z.string(),description_keywords:z.string(),excluded_keywords:z.string(),telegram_enabled:z.boolean(),notify_once:z.boolean(),minimum_match_score:z.coerce.number().min(0).max(100),crawl_interval_minutes:z.coerce.number().min(5)}).refine(x=>!x.min_price||!x.max_price||x.min_price<=x.max_price,{path:['max_price'],message:'حداکثر باید بیشتر از حداقل باشد'});type Form=z.infer<typeof schema>;
-const defaults:Form={title:'',brand:'',model:'',trim:'',min_year:null,max_year:null,min_price:null,max_price:null,min_mileage:null,max_mileage:null,cities:['تهران'],districts:[],colors:[],transmission:'',body_condition:'',description_keywords:'',excluded_keywords:'',telegram_enabled:true,notify_once:true,minimum_match_score:70,crawl_interval_minutes:60};
-export default function SearchFormPage(){const {id}=useParams();const nav=useNavigate();const {register,handleSubmit,reset,control,watch,setValue,formState:{errors}}=useForm<Form>({resolver:zodResolver(schema),defaultValues:defaults});const brand=watch('brand'),model=watch('model');useQuery({queryKey:['search',id],enabled:!!id,queryFn:async()=>{const {data}=await api.get<SearchProfile>(`/searches/${id}/`);reset({...data,districts:data.districts??[],description_keywords:data.description_keywords.join('\n'),excluded_keywords:data.excluded_keywords.join('\n')});return data}});const save=useMutation({mutationFn:(v:Form)=>{const list=(s:string)=>s.split(/[،,\n]/).map(x=>x.trim()).filter(Boolean);const transmission=v.transmission==='اتوماتیک'?'automatic':v.transmission==='دنده‌ای'?'manual':v.transmission;const payload={...v,transmission,description_keywords:list(v.description_keywords),excluded_keywords:list(v.excluded_keywords)};return id?api.patch(`/searches/${id}/`,payload):api.post('/searches/',payload)},onSuccess:()=>nav('/searches')});const Field=({name,label,type='text',suggestions=[]}:{name:keyof Form;label:string;type?:string;suggestions?:number[]})=>{const listId=`suggest-${String(name)}`;return <label><span className="label">{label}</span><input type={type} list={suggestions.length?listId:undefined} className="field" {...register(name)}/>{suggestions.length>0&&<datalist id={listId}>{suggestions.map(x=><option key={x} value={x}/>)}</datalist>}{errors[name]&&<small className="mt-1 block text-red-600">{errors[name]?.message as string}</small>}</label>};const Auto=({name,label,options,disabled=false}:{name:'brand'|'model'|'trim'|'transmission'|'body_condition';label:string;options:string[];disabled?:boolean})=><label><span className="label">{label}</span><Controller name={name} control={control} render={({field})=><Autocomplete value={field.value} onChange={v=>{field.onChange(v);if(name==='brand'){setValue('model','');setValue('trim','')}if(name==='model')setValue('trim','')}} options={options} disabled={disabled}/>} /></label>;return <form onSubmit={handleSubmit(v=>save.mutate(v))} className="mx-auto max-w-5xl space-y-6"><div><h1 className="text-2xl font-extrabold">{id?'ویرایش جستجو':'جستجوی جدید خودرو'}</h1><p className="mt-2 text-sm text-black/45">گزینه‌ها از taxonomy عمومی بخش خودرو دیوار تهیه شده‌اند و با تایپ قابل جستجو هستند.</p></div><section className="card p-6"><h2 className="mb-5 font-bold">اطلاعات پایه خودرو</h2><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4"><Field name="title" label="نام جستجو"/><Auto name="brand" label="برند" options={BRAND_OPTIONS}/><Auto name="model" label="مدل" options={MODELS_BY_BRAND[brand]??[]} disabled={!brand}/><Auto name="trim" label="تیپ" options={TRIMS_BY_MODEL[model]??[]} disabled={!model}/><label><span className="label">حداقل سال</span><Controller name="min_year" control={control} render={({field})=><Autocomplete value={field.value?.toString()??''} onChange={v=>field.onChange(v?Number(v):null)} options={YEARS}/>} /></label><label><span className="label">حداکثر سال</span><Controller name="max_year" control={control} render={({field})=><Autocomplete value={field.value?.toString()??''} onChange={v=>field.onChange(v?Number(v):null)} options={YEARS}/>} /></label></div></section><section className="card p-6"><h2 className="mb-5 font-bold">قیمت و کارکرد</h2><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4"><Field name="min_price" label="حداقل قیمت (تومان)" type="number" suggestions={PRICE_SUGGESTIONS}/><Field name="max_price" label="حداکثر قیمت (تومان)" type="number" suggestions={PRICE_SUGGESTIONS}/><Field name="min_mileage" label="حداقل کارکرد" type="number" suggestions={MILEAGE_SUGGESTIONS}/><Field name="max_mileage" label="حداکثر کارکرد" type="number" suggestions={MILEAGE_SUGGESTIONS}/></div></section><section className="card p-6"><h2 className="mb-5 font-bold">مکان و مشخصات</h2><div className="grid gap-5 md:grid-cols-2"><label><span className="label">شهرها</span><Controller name="cities" control={control} render={({field})=><MultiAutocomplete values={field.value} onChange={field.onChange} options={CITIES} placeholder="جستجو و افزودن شهر"/>}/></label><label><span className="label">محله‌ها</span><Controller name="districts" control={control} render={({field})=><MultiAutocomplete values={field.value} onChange={field.onChange} options={TEHRAN_DISTRICTS} placeholder="جستجو و افزودن محله"/>}/></label><label><span className="label">رنگ‌های مجاز</span><Controller name="colors" control={control} render={({field})=><MultiAutocomplete values={field.value} onChange={field.onChange} options={COLORS} placeholder="جستجو و افزودن رنگ"/>}/></label><Auto name="transmission" label="نوع گیربکس" options={TRANSMISSIONS}/><Auto name="body_condition" label="وضعیت بدنه" options={BODY_CONDITIONS}/></div></section><section className="card p-6"><h2 className="mb-5 font-bold">فیلتر واژه‌ها</h2><div className="grid gap-5 md:grid-cols-2"><label><span className="label">واژه‌های لازم (هر خط یک مورد)</span><textarea rows={4} className="field" {...register('description_keywords')}/></label><label><span className="label">واژه‌های حذف‌کننده</span><textarea rows={4} className="field" {...register('excluded_keywords')}/></label></div></section><section className="card p-6"><h2 className="mb-5 font-bold">اعلان و زمان‌بندی</h2><div className="grid gap-5 md:grid-cols-2"><Field name="minimum_match_score" label="حداقل امتیاز تطابق" type="number"/><Field name="crawl_interval_minutes" label="فاصله بررسی (دقیقه)" type="number"/></div><div className="mt-5 flex flex-wrap gap-6"><Controller name="telegram_enabled" control={control} render={({field})=><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.value} onChange={field.onChange}/> اعلان تلگرام فعال باشد</label>}/><Controller name="notify_once" control={control} render={({field})=><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={field.value} onChange={field.onChange}/> هر آگهی فقط یک‌بار ارسال شود</label>}/></div></section>{save.isError&&<div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">ذخیره انجام نشد. ورودی‌ها را بررسی کنید.</div>}<div className="flex justify-end gap-3"><button type="button" className="btn-secondary" onClick={()=>nav(-1)}>انصراف</button><button className="btn-primary" disabled={save.isPending}>{save.isPending?'در حال ذخیره…':'ذخیره جستجو'}</button></div></form>}
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Controller, useForm } from "react-hook-form";
+import { useNavigate, useParams } from "react-router-dom";
+import { z } from "zod";
+import { api } from "../api/client";
+import type { SearchProfile } from "../types";
+import { Autocomplete, MultiAutocomplete } from "../components/Autocomplete";
+import {
+  BODY_CONDITIONS,
+  BRAND_OPTIONS,
+  CITIES,
+  COLORS,
+  MILEAGE_SUGGESTIONS,
+  MODELS_BY_BRAND,
+  PRICE_SUGGESTIONS,
+  TEHRAN_DISTRICTS,
+  TRANSMISSIONS,
+  TRIMS_BY_MODEL,
+  YEARS,
+} from "../data/vehicleOptions";
+const optionalNumber = z.preprocess(
+  (v) => (v === "" ? null : Number(v)),
+  z.number().nonnegative().nullable(),
+);
+const schema = z
+  .object({
+    title: z.string().min(2, "نام جستجو را وارد کنید"),
+    brand: z.string(),
+    model: z.string(),
+    trim: z.string(),
+    min_year: optionalNumber,
+    max_year: optionalNumber,
+    min_price: optionalNumber,
+    max_price: optionalNumber,
+    min_mileage: optionalNumber,
+    max_mileage: optionalNumber,
+    cities: z.array(z.string()),
+    districts: z.array(z.string()),
+    colors: z.array(z.string()),
+    transmission: z.string(),
+    body_condition: z.string(),
+    description_keywords: z.string(),
+    excluded_keywords: z.string(),
+    telegram_enabled: z.boolean(),
+    send_images: z.boolean(),
+    notify_once: z.boolean(),
+    minimum_match_score: z.coerce.number().min(0).max(100),
+    crawl_interval_minutes: z.coerce.number().min(5),
+  })
+  .refine((x) => !x.min_price || !x.max_price || x.min_price <= x.max_price, {
+    path: ["max_price"],
+    message: "حداکثر باید بیشتر از حداقل باشد",
+  });
+type Form = z.infer<typeof schema>;
+const defaults: Form = {
+  title: "",
+  brand: "",
+  model: "",
+  trim: "",
+  min_year: null,
+  max_year: null,
+  min_price: null,
+  max_price: null,
+  min_mileage: null,
+  max_mileage: null,
+  cities: ["تهران"],
+  districts: [],
+  colors: [],
+  transmission: "",
+  body_condition: "",
+  description_keywords: "",
+  excluded_keywords: "",
+  telegram_enabled: true,
+  send_images: false,
+  notify_once: true,
+  minimum_match_score: 70,
+  crawl_interval_minutes: 60,
+};
+export default function SearchFormPage() {
+  const { id } = useParams();
+  const nav = useNavigate();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<Form>({ resolver: zodResolver(schema), defaultValues: defaults });
+  const brand = watch("brand"),
+    model = watch("model");
+  useQuery({
+    queryKey: ["search", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data } = await api.get<SearchProfile>(`/searches/${id}/`);
+      reset({
+        ...data,
+        districts: data.districts ?? [],
+        description_keywords: data.description_keywords.join("\n"),
+        excluded_keywords: data.excluded_keywords.join("\n"),
+      });
+      return data;
+    },
+  });
+  const save = useMutation({
+    mutationFn: (v: Form) => {
+      const list = (s: string) =>
+        s
+          .split(/[،,\n]/)
+          .map((x) => x.trim())
+          .filter(Boolean);
+      const transmission =
+        v.transmission === "اتوماتیک"
+          ? "automatic"
+          : v.transmission === "دنده‌ای"
+            ? "manual"
+            : v.transmission;
+      const payload = {
+        ...v,
+        transmission,
+        description_keywords: list(v.description_keywords),
+        excluded_keywords: list(v.excluded_keywords),
+      };
+      return id
+        ? api.patch(`/searches/${id}/`, payload)
+        : api.post("/searches/", payload);
+    },
+    onSuccess: () => nav("/searches"),
+  });
+  const Field = ({
+    name,
+    label,
+    type = "text",
+    suggestions = [],
+  }: {
+    name: keyof Form;
+    label: string;
+    type?: string;
+    suggestions?: number[];
+  }) => {
+    const listId = `suggest-${String(name)}`;
+    return (
+      <label>
+        <span className="label">{label}</span>
+        <input
+          type={type}
+          list={suggestions.length ? listId : undefined}
+          className="field"
+          {...register(name)}
+        />
+        {suggestions.length > 0 && (
+          <datalist id={listId}>
+            {suggestions.map((x) => (
+              <option key={x} value={x} />
+            ))}
+          </datalist>
+        )}
+        {errors[name] && (
+          <small className="mt-1 block text-red-600">
+            {errors[name]?.message as string}
+          </small>
+        )}
+      </label>
+    );
+  };
+  const Auto = ({
+    name,
+    label,
+    options,
+    disabled = false,
+  }: {
+    name: "brand" | "model" | "trim" | "transmission" | "body_condition";
+    label: string;
+    options: string[];
+    disabled?: boolean;
+  }) => (
+    <label>
+      <span className="label">{label}</span>
+      <Controller
+        name={name}
+        control={control}
+        render={({ field }) => (
+          <Autocomplete
+            value={field.value}
+            onChange={(v) => {
+              field.onChange(v);
+              if (name === "brand") {
+                setValue("model", "");
+                setValue("trim", "");
+              }
+              if (name === "model") setValue("trim", "");
+            }}
+            options={options}
+            disabled={disabled}
+          />
+        )}
+      />
+    </label>
+  );
+  return (
+    <form
+      onSubmit={handleSubmit((v) => save.mutate(v))}
+      className="mx-auto max-w-5xl space-y-6"
+    >
+      <div>
+        <h1 className="text-2xl font-extrabold">
+          {id ? "ویرایش جستجو" : "جستجوی جدید خودرو"}
+        </h1>
+        <p className="mt-2 text-sm text-black/45">
+          گزینه‌ها از taxonomy عمومی بخش خودرو دیوار تهیه شده‌اند و با تایپ قابل
+          جستجو هستند.
+        </p>
+      </div>
+      <section className="card p-6">
+        <h2 className="mb-5 font-bold">اطلاعات پایه خودرو</h2>
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <Field name="title" label="نام جستجو" />
+          <Auto name="brand" label="برند" options={BRAND_OPTIONS} />
+          <Auto
+            name="model"
+            label="مدل"
+            options={MODELS_BY_BRAND[brand] ?? []}
+            disabled={!brand}
+          />
+          <Auto
+            name="trim"
+            label="تیپ"
+            options={TRIMS_BY_MODEL[model] ?? []}
+            disabled={!model}
+          />
+          <label>
+            <span className="label">حداقل سال</span>
+            <Controller
+              name="min_year"
+              control={control}
+              render={({ field }) => (
+                <Autocomplete
+                  value={field.value?.toString() ?? ""}
+                  onChange={(v) => field.onChange(v ? Number(v) : null)}
+                  options={YEARS}
+                />
+              )}
+            />
+          </label>
+          <label>
+            <span className="label">حداکثر سال</span>
+            <Controller
+              name="max_year"
+              control={control}
+              render={({ field }) => (
+                <Autocomplete
+                  value={field.value?.toString() ?? ""}
+                  onChange={(v) => field.onChange(v ? Number(v) : null)}
+                  options={YEARS}
+                />
+              )}
+            />
+          </label>
+        </div>
+      </section>
+      <section className="card p-6">
+        <h2 className="mb-5 font-bold">قیمت و کارکرد</h2>
+        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <Field
+            name="min_price"
+            label="حداقل قیمت (تومان)"
+            type="number"
+            suggestions={PRICE_SUGGESTIONS}
+          />
+          <Field
+            name="max_price"
+            label="حداکثر قیمت (تومان)"
+            type="number"
+            suggestions={PRICE_SUGGESTIONS}
+          />
+          <Field
+            name="min_mileage"
+            label="حداقل کارکرد"
+            type="number"
+            suggestions={MILEAGE_SUGGESTIONS}
+          />
+          <Field
+            name="max_mileage"
+            label="حداکثر کارکرد"
+            type="number"
+            suggestions={MILEAGE_SUGGESTIONS}
+          />
+        </div>
+      </section>
+      <section className="card p-6">
+        <h2 className="mb-5 font-bold">مکان و مشخصات</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          <label>
+            <span className="label">شهرها</span>
+            <Controller
+              name="cities"
+              control={control}
+              render={({ field }) => (
+                <MultiAutocomplete
+                  values={field.value}
+                  onChange={field.onChange}
+                  options={CITIES}
+                  placeholder="جستجو و افزودن شهر"
+                />
+              )}
+            />
+          </label>
+          <label>
+            <span className="label">محله‌ها</span>
+            <Controller
+              name="districts"
+              control={control}
+              render={({ field }) => (
+                <MultiAutocomplete
+                  values={field.value}
+                  onChange={field.onChange}
+                  options={TEHRAN_DISTRICTS}
+                  placeholder="جستجو و افزودن محله"
+                />
+              )}
+            />
+          </label>
+          <label>
+            <span className="label">رنگ‌های مجاز</span>
+            <Controller
+              name="colors"
+              control={control}
+              render={({ field }) => (
+                <MultiAutocomplete
+                  values={field.value}
+                  onChange={field.onChange}
+                  options={COLORS}
+                  placeholder="جستجو و افزودن رنگ"
+                />
+              )}
+            />
+          </label>
+          <Auto
+            name="transmission"
+            label="نوع گیربکس"
+            options={TRANSMISSIONS}
+          />
+          <Auto
+            name="body_condition"
+            label="وضعیت بدنه"
+            options={BODY_CONDITIONS}
+          />
+        </div>
+      </section>
+      <section className="card p-6">
+        <h2 className="mb-5 font-bold">فیلتر واژه‌ها</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          <label>
+            <span className="label">واژه‌های لازم (هر خط یک مورد)</span>
+            <textarea
+              rows={4}
+              className="field"
+              {...register("description_keywords")}
+            />
+          </label>
+          <label>
+            <span className="label">واژه‌های حذف‌کننده</span>
+            <textarea
+              rows={4}
+              className="field"
+              {...register("excluded_keywords")}
+            />
+          </label>
+        </div>
+      </section>
+      <section className="card p-6">
+        <h2 className="mb-5 font-bold">اعلان و زمان‌بندی</h2>
+        <div className="grid gap-5 md:grid-cols-2">
+          <Field
+            name="minimum_match_score"
+            label="حداقل امتیاز تطابق"
+            type="number"
+          />
+          <Field
+            name="crawl_interval_minutes"
+            label="فاصله بررسی (دقیقه)"
+            type="number"
+          />
+        </div>
+        <div className="mt-5 flex flex-wrap gap-6">
+          <Controller
+            name="telegram_enabled"
+            control={control}
+            render={({ field }) => (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={field.onChange}
+                />{" "}
+                اعلان تلگرام فعال باشد
+              </label>
+            )}
+          />
+          <Controller
+            name="notify_once"
+            control={control}
+            render={({ field }) => (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={field.onChange}
+                />{" "}
+                هر آگهی فقط یک‌بار ارسال شود
+              </label>
+            )}
+          />
+          <Controller
+            name="send_images"
+            control={control}
+            render={({ field }) => (
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={field.onChange}
+                />{" "}
+                ارسال عکس‌ها به‌صورت آلبوم
+              </label>
+            )}
+          />
+        </div>
+      </section>
+      {save.isError && (
+        <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">
+          ذخیره انجام نشد. ورودی‌ها را بررسی کنید.
+        </div>
+      )}
+      <div className="flex justify-end gap-3">
+        <button type="button" className="btn-secondary" onClick={() => nav(-1)}>
+          انصراف
+        </button>
+        <button className="btn-primary" disabled={save.isPending}>
+          {save.isPending ? "در حال ذخیره…" : "ذخیره جستجو"}
+        </button>
+      </div>
+    </form>
+  );
+}
