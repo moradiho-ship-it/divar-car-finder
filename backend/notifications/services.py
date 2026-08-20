@@ -22,14 +22,21 @@ class TelegramService:
         if listing.transmission: lines.append(f"⚙️ گیربکس: {listing.transmission}")
         if listing.city: lines.append(f"📍 {listing.city}{'، ' + listing.district if listing.district else ''}")
         lines.extend(["", f"🎯 امتیاز تطابق: {fa_number(match.match_score)}٪"])
-        payload = {"chat_id": connection.chat_id, "text": "\n".join(lines), "reply_markup": {"inline_keyboard": [[{"text": "مشاهده آگهی", "url": listing.url}]]}}
+        message_text = "\n".join(lines)
+        payload = {"chat_id": connection.chat_id, "text": message_text, "reply_markup": {"inline_keyboard": [[{"text": "مشاهده آگهی", "url": listing.url}]]}}
         method = "sendPhoto" if listing.thumbnail_url else "sendMessage"
         if listing.thumbnail_url: payload.update({"photo": listing.thumbnail_url, "caption": payload.pop("text")})
         try:
-            response = httpx.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{method}", json=payload, timeout=15); response.raise_for_status(); body = response.json()
+            response = httpx.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{method}", json=payload, timeout=15)
+            if response.status_code == 400 and method == "sendPhoto":
+                logger.warning("telegram_photo_rejected_falling_back listing_id=%s response=%s", listing.id, response.text[:300])
+                method = "sendMessage"
+                payload = {"chat_id": connection.chat_id, "text": message_text, "reply_markup": {"inline_keyboard": [[{"text": "مشاهده آگهی", "url": listing.url}]]}}
+                response = httpx.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{method}", json=payload, timeout=15)
+            response.raise_for_status(); body = response.json()
             notification.status = "sent"; notification.external_message_id = str(body.get("result", {}).get("message_id", "")); notification.sent_at = timezone.now(); notification.error_message = ""
             logger.info("telegram_sent listing_id=%s search_profile_id=%s", listing.id, profile.id)
         except Exception as exc:
-            notification.status = "failed"; notification.error_message = str(exc)[:1000]; notification.retry_count += 1; logger.warning("telegram_failed listing_id=%s", listing.id)
+            response_text = getattr(locals().get("response"), "text", "")
+            notification.status = "failed"; notification.error_message = f"{exc}: {response_text}"[:1000]; notification.retry_count += 1; logger.warning("telegram_failed listing_id=%s", listing.id)
         notification.save(); return notification
-
