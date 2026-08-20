@@ -7,6 +7,12 @@ class SearchProfileSerializer(serializers.ModelSerializer):
         model = SearchProfile
         exclude = ("user",)
         read_only_fields = ("last_checked_at", "created_at", "updated_at")
+    def to_internal_value(self, data):
+        data = data.copy()
+        for field in ("min_year", "max_year", "min_price", "max_price", "min_mileage", "max_mileage"):
+            if field in data and (data[field] is None or str(data[field]).strip() == ""):
+                data[field] = None
+        return super().to_internal_value(data)
     def validate(self, data):
         for low, high, label in [("min_year", "max_year", "سال"), ("min_price", "max_price", "قیمت"), ("min_mileage", "max_mileage", "کارکرد")]:
             a, b = data.get(low, getattr(self.instance, low, None)), data.get(high, getattr(self.instance, high, None))
@@ -15,4 +21,3 @@ class SearchProfileSerializer(serializers.ModelSerializer):
         if not 0 <= score <= 100: raise serializers.ValidationError({"minimum_match_score": "امتیاز باید بین ۰ تا ۱۰۰ باشد."})
         if data.get("crawl_interval_minutes", 60) < 5: raise serializers.ValidationError({"crawl_interval_minutes": "حداقل فاصله بررسی ۵ دقیقه است."})
         return data
-

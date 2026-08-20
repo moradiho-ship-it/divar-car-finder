@@ -21,7 +21,12 @@ import {
   YEARS,
 } from "../data/vehicleOptions";
 const optionalNumber = z.preprocess(
-  (v) => (v === "" ? null : Number(v)),
+  (v) =>
+    v === null ||
+    v === undefined ||
+    (typeof v === "string" && v.trim() === "")
+      ? null
+      : Number(v),
   z.number().nonnegative().nullable(),
 );
 const schema = z
