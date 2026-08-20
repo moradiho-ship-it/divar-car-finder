@@ -124,6 +124,14 @@ class DivarListingProvider(ListingProvider):
                 if score: values[title.get_text(" ", strip=True)] = score.get_text(" ", strip=True)
             listing.chassis_condition = values.get("وضعیت شاسی‌ها", "")
             listing.body_condition = values.get("بدنه", listing.body_condition)
+            image_urls = []
+            for image in soup.select("img"):
+                url = image.get("src") or image.get("data-src") or ""
+                if url.startswith("//"): url = f"https:{url}"
+                if url.startswith("http") and ("postimage" in url or "/static/photo/" in url) and url not in image_urls:
+                    image_urls.append(url)
+            listing.image_urls = image_urls[:10]
+            if image_urls: listing.thumbnail_url = image_urls[0]
         except httpx.HTTPError as exc:
             logger.warning("detail_enrichment_failed token=%s error=%s", listing.external_id, type(exc).__name__)
         return listing

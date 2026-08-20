@@ -1,5 +1,62 @@
-export interface SearchProfile {id:number;title:string;is_active:boolean;brand:string;model:string;trim:string;min_year:number|null;max_year:number|null;min_price:number|null;max_price:number|null;min_mileage:number|null;max_mileage:number|null;cities:string[];districts:string[];colors:string[];transmission:string;body_condition:string;description_keywords:string[];excluded_keywords:string[];telegram_enabled:boolean;notify_once:boolean;minimum_match_score:number;crawl_interval_minutes:number;last_checked_at:string|null;matches_count:number}
-export interface Match {search_profile_id:number;search_title:string;match_score:number;matched_fields:Record<string,boolean>;failed_fields:string[];detected_at:string}
-export interface Listing {id:number;title:string;description:string;url:string;image_urls:string[];thumbnail_url:string;price:number|null;year:number|null;mileage:number|null;brand:string;model:string;color:string;transmission:string;body_condition:string;city:string;district:string;discovered_at:string;matches:Match[]}
-export interface Paginated<T>{count:number;next:string|null;previous:string|null;results:T[]}
-
+export interface SearchProfile {
+  id: number;
+  title: string;
+  is_active: boolean;
+  brand: string;
+  model: string;
+  trim: string;
+  min_year: number | null;
+  max_year: number | null;
+  min_price: number | null;
+  max_price: number | null;
+  min_mileage: number | null;
+  max_mileage: number | null;
+  cities: string[];
+  districts: string[];
+  colors: string[];
+  transmission: string;
+  body_condition: string;
+  description_keywords: string[];
+  excluded_keywords: string[];
+  telegram_enabled: boolean;
+  send_images: boolean;
+  notify_once: boolean;
+  minimum_match_score: number;
+  crawl_interval_minutes: number;
+  last_checked_at: string | null;
+  matches_count: number;
+}
+export interface Match {
+  search_profile_id: number;
+  search_title: string;
+  match_score: number;
+  matched_fields: Record<string, boolean>;
+  failed_fields: string[];
+  detected_at: string;
+}
+export interface Listing {
+  id: number;
+  title: string;
+  description: string;
+  url: string;
+  image_urls: string[];
+  thumbnail_url: string;
+  price: number | null;
+  year: number | null;
+  mileage: number | null;
+  brand: string;
+  model: string;
+  color: string;
+  transmission: string;
+  body_condition: string;
+  city: string;
+  district: string;
+  discovered_at: string;
+  matches: Match[];
+}
+export interface Paginated<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}

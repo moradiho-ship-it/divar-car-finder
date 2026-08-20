@@ -1,4 +1,4 @@
-import logging
+import json, logging
 import httpx
 from django.conf import settings
 from django.utils import timezone
@@ -8,6 +8,24 @@ FA = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 def fa_number(value): return f"{value:,}".translate(FA)
 
 class TelegramService:
+    def _send_album(self, chat_id, image_urls):
+        files, media = {}, []
+        for index, url in enumerate(image_urls[:10]):
+            image = httpx.get(url, timeout=15, follow_redirects=True)
+            image.raise_for_status()
+            content_type = image.headers.get("content-type", "image/jpeg").split(";")[0]
+            if not content_type.startswith("image/"): continue
+            key = f"photo{index}"
+            files[key] = (f"{key}.jpg", image.content, content_type)
+            media.append({"type": "photo", "media": f"attach://{key}"})
+        if not media: return None
+        response = httpx.post(
+            f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMediaGroup",
+            data={"chat_id": chat_id, "media": json.dumps(media)}, files=files, timeout=45,
+        )
+        response.raise_for_status()
+        return response.json()
+
     def notify(self, profile, listing, match):
         if not profile.telegram_enabled or not settings.TELEGRAM_BOT_TOKEN: return None
         connection = TelegramConnection.objects.filter(user=profile.user, is_verified=True).first()
@@ -26,16 +44,12 @@ class TelegramService:
         lines.extend(["", f"🎯 امتیاز تطابق: {fa_number(match.match_score)}٪"])
         message_text = "\n".join(lines)
         payload = {"chat_id": connection.chat_id, "text": message_text, "reply_markup": {"inline_keyboard": [[{"text": "مشاهده آگهی", "url": listing.url}]]}}
-        method = "sendPhoto" if listing.thumbnail_url else "sendMessage"
-        if listing.thumbnail_url: payload.update({"photo": listing.thumbnail_url, "caption": payload.pop("text")})
         try:
-            response = httpx.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{method}", json=payload, timeout=15)
-            if response.status_code == 400 and method == "sendPhoto":
-                logger.warning("telegram_photo_rejected_falling_back listing_id=%s response=%s", listing.id, response.text[:300])
-                method = "sendMessage"
-                payload = {"chat_id": connection.chat_id, "text": message_text, "reply_markup": {"inline_keyboard": [[{"text": "مشاهده آگهی", "url": listing.url}]]}}
-                response = httpx.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/{method}", json=payload, timeout=15)
+            response = httpx.post(f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage", json=payload, timeout=15)
             response.raise_for_status(); body = response.json()
+            if profile.send_images and listing.image_urls:
+                try: self._send_album(connection.chat_id, listing.image_urls)
+                except Exception as album_exc: logger.warning("telegram_album_failed listing_id=%s error=%s", listing.id, album_exc)
             notification.status = "sent"; notification.external_message_id = str(body.get("result", {}).get("message_id", "")); notification.sent_at = timezone.now(); notification.error_message = ""
             logger.info("telegram_sent listing_id=%s search_profile_id=%s", listing.id, profile.id)
         except Exception as exc:

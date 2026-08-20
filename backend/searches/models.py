@@ -23,6 +23,7 @@ class SearchProfile(models.Model):
     description_keywords = models.JSONField(default=list, blank=True)
     excluded_keywords = models.JSONField(default=list, blank=True)
     telegram_enabled = models.BooleanField(default=True)
+    send_images = models.BooleanField(default=False)
     notify_once = models.BooleanField(default=True)
     minimum_match_score = models.PositiveSmallIntegerField(default=70)
     crawl_interval_minutes = models.PositiveIntegerField(default=60)
@@ -31,4 +32,3 @@ class SearchProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     class Meta: ordering = ["-created_at"]
     def __str__(self): return self.title
-
