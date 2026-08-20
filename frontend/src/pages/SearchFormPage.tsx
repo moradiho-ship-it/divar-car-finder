@@ -7,6 +7,8 @@ import { z } from "zod";
 import { api } from "../api/client";
 import type { SearchProfile } from "../types";
 import { Autocomplete, MultiAutocomplete } from "../components/Autocomplete";
+import { BellRing, CarFront, Check, MapPin, SlidersHorizontal, Sparkles, WalletCards } from "lucide-react";
+import { faNum, money } from "../lib/format";
 import {
   BODY_CONDITIONS,
   BRAND_OPTIONS,
@@ -107,6 +109,9 @@ export default function SearchFormPage() {
   } = useForm<Form>({ resolver: zodResolver(schema), defaultValues: defaults });
   const brand = watch("brand"),
     model = watch("model");
+  const values = watch();
+  const filterCount = [values.brand,values.model,values.trim,values.min_year,values.max_year,values.min_price,values.max_price,values.max_mileage,values.transmission,values.body_condition,values.cities.length,values.districts.length,values.colors.length,values.description_keywords].filter(Boolean).length;
+  const restrictiveness = filterCount >= 10 ? "محدود" : filterCount >= 5 ? "متعادل" : "گسترده";
   useQuery({
     queryKey: ["search", id],
     enabled: !!id,
@@ -232,15 +237,20 @@ export default function SearchFormPage() {
       onSubmit={handleSubmit((v) => save.mutate(v))}
       className="mx-auto max-w-5xl space-y-6"
     >
-      <div>
-        <h1 className="text-2xl font-extrabold">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+       <div>
+        <p className="eyebrow mb-2">دستیار ساخت جستجو</p>
+        <h1 className="page-title">
           {id ? "ویرایش جستجو" : "جستجوی جدید خودرو"}
         </h1>
-        <p className="mt-2 text-sm text-black/45">
-          گزینه‌ها از taxonomy عمومی بخش خودرو دیوار تهیه شده‌اند و با تایپ قابل
-          جستجو هستند.
+        <p className="muted mt-2 text-sm leading-7">
+          مشخصات خودروی دلخواه را مرحله‌به‌مرحله تعریف کنید؛ هر گزینه بعداً قابل ویرایش است.
         </p>
+       </div>
+       <div className="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs" style={{borderColor:'rgb(var(--border))'}}><span className={`status-dot ${restrictiveness==='محدود'?'bg-amber-500':restrictiveness==='متعادل'?'bg-emerald-500':'bg-blue-500'}`}/>دامنه جستجو: <strong>{restrictiveness}</strong></div>
       </div>
+      <nav aria-label="مراحل ساخت جستجو" className="card overflow-x-auto p-2"><ol className="flex min-w-[680px] items-center">{[[CarFront,'خودرو'],[WalletCards,'بودجه و سال'],[SlidersHorizontal,'شرایط'],[MapPin,'موقعیت'],[Sparkles,'فیلتر هوشمند'],[BellRing,'اعلان‌ها']].map(([Icon,label],i)=><li className="flex flex-1 items-center" key={label as string}><div className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium"><span className="grid h-7 w-7 place-items-center rounded-lg bg-wine/[.08] text-wine"><Icon size={15}/></span>{label as string}</div>{i<5&&<span className="h-px flex-1" style={{background:'rgb(var(--border))'}}/>}</li>)}</ol></nav>
+      <aside className="card border-wine/15 bg-wine/[.025] p-5"><div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between"><div><div className="flex items-center gap-2 text-sm font-semibold"><Sparkles size={17} className="text-wine"/>در حال جستجوی</div><p className="mt-2 text-lg font-semibold">{[values.brand,values.model,values.trim].filter(Boolean).join(' ')||'همه خودروها'}</p><div className="muted mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs"><span>{values.min_year||values.max_year?`مدل ${faNum(values.min_year)} تا ${faNum(values.max_year)}`:'بدون محدودیت سال'}</span><span>{values.max_price?`تا ${money(values.max_price)}`:'بدون سقف قیمت'}</span><span>{values.max_mileage?`زیر ${faNum(values.max_mileage)} کیلومتر`:'هر میزان کارکرد'}</span><span>{values.cities.join('، ')||'همه شهرها'}</span></div></div><div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300"><Check size={16}/>خلاصه با تغییر گزینه‌ها به‌روز می‌شود</div></div></aside>
       <section className="card p-6">
         <h2 className="mb-5 font-bold">اطلاعات پایه خودرو</h2>
         <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
