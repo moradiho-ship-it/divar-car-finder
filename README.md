@@ -4,7 +4,7 @@
 
 ## نسخه آنلاین
 
-- داشبورد: <https://divar-car-finder.pages.dev>
+- داشبورد: <https://divar-car-finder-web.onrender.com>
 - API: <https://divar-car-finder-api.onrender.com/api/>
 - سلامت سرویس: <https://divar-car-finder-api.onrender.com/api/health/>
 

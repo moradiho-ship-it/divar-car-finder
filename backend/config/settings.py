@@ -35,7 +35,11 @@ AUTH_PASSWORD_VALIDATORS = [{"NAME": f"django.contrib.auth.password_validation.{
 LANGUAGE_CODE, TIME_ZONE, USE_I18N, USE_TZ = "fa-ir", "Asia/Tehran", True, True
 STATIC_URL, STATIC_ROOT = "static/", BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-CORS_ALLOWED_ORIGINS = [x for x in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",") if x]
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
+    *[x for x in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(",") if x],
+    "https://divar-car-finder.pages.dev",
+    "https://divar-car-finder-web.onrender.com",
+]))
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework_simplejwt.authentication.JWTAuthentication",),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
