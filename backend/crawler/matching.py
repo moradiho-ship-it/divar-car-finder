@@ -26,7 +26,12 @@ def match_listing(profile, listing: NormalizedListing) -> MatchResult:
         matched[field] = ok
         if ok: points += weight
         else: failed.append(field)
-    exact("brand", profile.brand, listing.brand or listing.title); exact("model", profile.model, listing.model or listing.title)
+    model_actual = listing.model or listing.title
+    model_is_visible = bool(profile.model) and profile.model.casefold() in str(model_actual).casefold()
+    brand_actual = listing.brand or listing.title
+    if profile.brand and model_is_visible and profile.brand.casefold() not in str(brand_actual).casefold():
+        brand_actual = f"{profile.brand} {brand_actual}"
+    exact("brand", profile.brand, brand_actual); exact("model", profile.model, model_actual)
     exact("trim", profile.trim, listing.trim or listing.title, False, 6)
     between("year", profile.min_year, profile.max_year, listing.year); between("price", profile.min_price, profile.max_price, listing.price, 18)
     between("mileage", profile.min_mileage, profile.max_mileage, listing.mileage)
@@ -41,4 +46,3 @@ def match_listing(profile, listing: NormalizedListing) -> MatchResult:
     score = round(100 * points / possible) if possible else 100
     hard_failed = any(x in failed for x in ("brand", "model", "year", "price", "mileage")) or any(x.startswith("excluded:") for x in failed)
     return MatchResult(not hard_failed and score >= profile.minimum_match_score, score, matched, failed)
-

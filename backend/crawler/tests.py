@@ -42,6 +42,21 @@ def test_divar_html_card_extracts_vehicle_values():
     assert listing.year == 1397
     assert listing.mileage == 128_000
 
+def test_divar_converts_gregorian_vehicle_year_to_jalali():
+    html = '<a href="/v/test/abc"><h2>کیا اسپورتیج ۲۰۱۵</h2><span>۱۰۰,۰۰۰ کیلومتر</span><span>۵,۰۰۰,۰۰۰,۰۰۰ تومان</span></a>'
+    listing = DivarParser().parse(html)[0]
+    assert listing.year == 1394
+
+def test_model_name_can_infer_omitted_brand():
+    class P:
+        brand = "کیا"; model = "اسپورتیج"; trim = ""
+        min_year = 1394; max_year = 1405; min_price = None; max_price = 5_500_000_000
+        min_mileage = max_mileage = None; cities = ["تهران"]; colors = []
+        transmission = body_condition = ""; description_keywords = excluded_keywords = []
+        minimum_match_score = 70
+    listing = NormalizedListing("x", "اسپورتیج ۲۰۱۵ فول", "https://example.com", price=5_000_000_000, year=1394, city="تهران")
+    assert match_listing(P(), listing).matched
+
 def test_divar_detail_extracts_chassis_and_body():
     class Response:
         text = '<div class="kt-base-row"><p class="kt-score-row__title">وضعیت شاسی‌ها</p><div class="kt-score-row__score">سالم و پلمپ</div></div><div class="kt-base-row"><p class="kt-score-row__title">بدنه</p><div class="kt-score-row__score">سالم و بی‌خط و خش</div></div><h2 class="kt-title-row__title">توضیحات</h2><div><p class="kt-description-row__text">خودرو کاملاً سالم است.\nسند تک‌برگ.</p></div>'

@@ -45,12 +45,11 @@ class DivarParser:
                 if token and title and is_post_card and not any(x.external_id == str(token) for x in found):
                     web_info = (((node.get("action") or {}).get("payload") or {}).get("web_info") or {})
                     title_text = str(title)
-                    normalized_title = title_text.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
-                    year_match = re.search(r"(?<!\d)(1[34]\d{2})(?!\d)", normalized_title)
+                    year = self._year(title_text)
                     found.append(NormalizedListing(
                         str(token), title_text, f"https://divar.ir/v/-/{token}",
                         self._number(node.get("price") or node.get("middle_description_text")),
-                        year=self._number(year_match.group(1)) if year_match else None,
+                        year=year,
                         mileage=self._number(node.get("mileage") or node.get("top_description_text")),
                         city=str(web_info.get("city_persian") or node.get("city") or ""),
                         district=str(web_info.get("district_persian") or node.get("district") or ""),
@@ -68,12 +67,7 @@ class DivarParser:
             if token and title:
                 title_text = title.get_text(" ", strip=True)
                 card_text = link.get_text(" ", strip=True)
-                normalized_title = title_text.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
-                year_match = re.search(r"(?<!\d)(1[34]\d{2})(?!\d)", normalized_title)
-                if not year_match:
-                    year_match = re.search(r"(?<!\d)(9\d)(?!\d)", normalized_title)
-                year = self._number(year_match.group(1)) if year_match else None
-                if year is not None and year < 100: year += 1300
+                year = self._year(title_text)
                 price_match = re.search(r"([\d۰-۹٬,]+)\s*تومان", card_text)
                 mileage_match = re.search(r"([\d۰-۹٬,]+)\s*کیلومتر", card_text)
                 image = link.select_one("img")
@@ -89,6 +83,16 @@ class DivarParser:
     def _number(value):
         if isinstance(value, int): return value
         digits = re.sub(r"\D", "", str(value or "")); return int(digits) if digits else None
+
+    @classmethod
+    def _year(cls, title):
+        normalized = str(title or "").translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789"))
+        match = re.search(r"(?<!\d)((?:1[34]|19|20)\d{2})(?!\d)", normalized)
+        if match:
+            year = int(match.group(1))
+            return year - 621 if year >= 1900 else year
+        short = re.search(r"(?<!\d)(9\d)(?!\d)", normalized)
+        return int(short.group(1)) + 1300 if short else None
 
 class DivarListingProvider(ListingProvider):
     name = "divar"
