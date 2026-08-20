@@ -1,85 +1,202 @@
 # خودروبان — Divar Car Finder
 
-یک داشبورد فارسی RTL برای تعریف جستجوی خودرو، بررسی دوره‌ای آگهی‌های دیوار، تطبیق سمت سرور و اعلان بدون تکرار در تلگرام.
+خودروبان یک داشبورد فارسی RTL برای ساخت جستجوهای خودرو، پایش دوره‌ای آگهی‌های دیوار، تطبیق سمت سرور و ارسال اعلان تلگرام است.
 
 ## نسخه آنلاین
 
 - داشبورد: <https://divar-car-finder-web.onrender.com>
 - API: <https://divar-car-finder-api.onrender.com/api/>
-- سلامت سرویس: <https://divar-car-finder-api.onrender.com/api/health/>
+- Health check: <https://divar-car-finder-api.onrender.com/api/health/>
+- مخزن: <https://github.com/moradiho-ship-it/divar-car-finder>
 
-API روی Render Free، رابط روی Cloudflare Pages، دیتابیس روی Supabase و اجرای
-ساعتی crawler روی Supabase Edge Functions و Supabase Cron قرار دارد.
+سرویس‌های رایگان Render ممکن است پس از مدتی عدم استفاده sleep شوند؛ اولین درخواست می‌تواند حدود یک دقیقه طول بکشد.
 
-## معماری
+## قابلیت‌ها
 
-- `backend/`: Django 4.2، DRF، JWT، PostgreSQL/Supabase، Celery و Redis
+- ساخت چند جستجوی مستقل با برند، مدل، تیپ، سال، قیمت، کارکرد، شهر، محله، رنگ، گیربکس، وضعیت بدنه و واژه‌های لازم/حذف‌کننده
+- فهرست‌های قابل جستجو و تکمیل خودکار بر اساس taxonomy خودروهای دیوار
+- حذف کامل فیلترهای عددی خالی؛ مقدار خالی هرگز به صفر تبدیل نمی‌شود
+- پشتیبانی از سال شمسی و تبدیل سال میلادی خودروهای وارداتی به سال شمسی
+- استخراج قیمت، سال، کارکرد، شهر، توضیحات کامل، وضعیت شاسی، وضعیت بدنه و تصاویر صفحه جزئیات
+- جلوگیری از ثبت آگهی، تطبیق و اعلان تکراری
+- اتصال حساب تلگرام با deep-link یک‌بارمصرف
+- اعلان متنی همراه مشخصات و لینک مستقیم آگهی
+- ارسال اختیاری حداکثر ۱۰ تصویر به‌صورت Telegram Media Group
+- نمایش تصاویر آگهی در carousel با thumbnail و کنترل قبلی/بعدی
+- انتخاب تکی، انتخاب همه و حذف گروهی آگهی‌های پیدا‌شده
+- نمایش خطاهای validation برگشتی API زیر فیلد و داخل فرم
+- تاریخچه اجرای crawler و آمار روزانه داشبورد
+
+## معماری production
+
+```text
+Browser
+  └─ React static site (Render)
+       └─ Django REST API (Render Free)
+            ├─ Supabase PostgreSQL
+            ├─ Divar listing/detail pages
+            └─ Telegram Bot API
+
+Supabase pg_cron (minute 17 of every hour)
+  └─ Supabase Edge Function: trigger-crawl
+       └─ protected Django crawl-due endpoint
+```
+
+- `backend/`: Django 4.2، Django REST Framework، JWT و PostgreSQL
 - `frontend/`: React، Vite، TypeScript، Tailwind، TanStack Query، React Hook Form و Zod
-- `crawler/`: قرارداد مستقل `ListingProvider`، سازنده URL، کلاینت/پارسر دیوار، نرمال‌ساز، موتور تطبیق و workflow تراکنشی
-- `notifications/`: اتصال امن تلگرام با توکن یک‌بارمصرف ۱۵ دقیقه‌ای و ارسال پیام
+- `backend/crawler/`: provider interface، URL builder، parser، detail enrichment و matching engine
+- `backend/notifications/`: اتصال و ارسال Telegram، album upload و delivery status
+- `supabase/functions/trigger-crawl/`: پل محافظت‌شده بین pg_cron و Render
 
-احراز هویت با کاربر Django و JWT انجام می‌شود. این انتخاب برای استقرار مستقل، Django Admin و workerها ساده‌تر است. تمام QuerySetهای API بر اساس کاربر فعلی محدود شده‌اند. کلاینت هرگز کلید خصوصی Supabase یا توکن ربات را دریافت نمی‌کند.
+اجرای production روی Render رایگان synchronous است و به worker دائمی یا Redis نیاز ندارد. ساختار Celery برای استقرارهای دارای worker/Redis نیز حفظ شده است.
 
-سیاست حذف تکرار سه‌لایه است: `(provider, external_id)` برای آگهی، `(search_profile, listing)` برای تطابق، و `(user, listing, channel)` برای اعلان. بنابراین یک آگهی می‌تواند با چند جستجو منطبق باشد اما برای یک کاربر فقط یک پیام تلگرام می‌سازد.
+## ساختار پروژه
 
-## راه‌اندازی مستقیم
+```text
+backend/
+  accounts/       users and current-user API
+  searches/       search profiles and validation
+  listings/       listings, matches and safe bulk deletion
+  crawler/        Divar provider, parser, matching and crawl runs
+  notifications/  Telegram connection and delivery
+  dashboard/      summary, health and scheduled crawl endpoint
+frontend/
+  src/components/ reusable autocomplete and UI components
+  src/data/       vehicle taxonomy candidates
+  src/pages/      dashboard, searches, listings and Telegram pages
+supabase/
+  functions/trigger-crawl/
+  migrations/     pg_cron/pg_net scheduling
+```
 
-نیازمندی‌ها: Python 3.10+، Node 20+ و Redis 7.
+## راه‌اندازی محلی
+
+نیازمندی‌ها: Python 3.10+، Node.js 20+ و در حالت asynchronous، Redis 7.
 
 ```bash
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env
-cd backend
+
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
+pip install -r backend/requirements.txt
+python backend/manage.py migrate
+python backend/manage.py createsuperuser
+python backend/manage.py runserver
 ```
 
-در ترمینال‌های جدا:
+در ترمینال دیگر:
 
 ```bash
-cd backend && source .venv/bin/activate && celery -A config worker -l info
-cd backend && source .venv/bin/activate && celery -A config beat -l info
-cd frontend && npm install && npm run dev
+cd frontend
+npm install
+npm run dev
 ```
 
-رابط در `http://localhost:5173`، API در `http://localhost:8000/api/`، سلامت در `GET /api/health/` و ادمین در `/admin/` است.
+- UI: `http://localhost:5173`
+- API: `http://localhost:8000/api/`
+- Admin: `http://localhost:8000/admin/`
+- Health: `http://localhost:8000/api/health/`
 
-## Supabase
-
-در Supabase یک پروژه PostgreSQL موجود است. `DATABASE_URL` را فقط در `backend/.env` قرار دهید. برای اتصال‌های IPv4 یا محیط‌های serverless می‌توان از Connection Pooler ارائه‌شده در تنظیمات Supabase استفاده کرد. سپس `python manage.py migrate` را اجرا کنید. migrationها هیچ جدول موجودی را حذف نمی‌کنند.
-
-## تلگرام
-
-1. در BotFather یک ربات بسازید و `TELEGRAM_BOT_TOKEN` و نام بدون `@` را در محیط backend قرار دهید.
-2. webhook را به `https://YOUR_BACKEND/api/telegram/webhook/` تنظیم کنید:
-   `https://api.telegram.org/bot<TOKEN>/setWebhook?url=<URL>`
-3. کاربر در صفحه اتصال تلگرام deep-link می‌گیرد. مقدار `/start` به شکل hash در دیتابیس نگهداری می‌شود، ۱۵ دقیقه اعتبار دارد و پس از مصرف پاک می‌شود.
-
-## زمان‌بندی و اجرای دستی
-
-Celery Beat هر دقیقه پروفایل‌های موعدرسیده را پیدا می‌کند؛ فاصله هر پروفایل پیش‌فرض ۶۰ دقیقه است. Redis lock مانع اجرای هم‌زمان یک پروفایل می‌شود. جایگزین سبک cron:
+برای اجرای asynchronous محلی:
 
 ```bash
-cd backend && python manage.py crawl_due
+cd backend
+celery -A config worker -l info
+celery -A config beat -l info
 ```
 
-اجرای دستی از داشبورد یا `POST /api/searches/:id/run/` job را در صف می‌گذارد و rate-limit دارد.
+## متغیرهای محیطی
 
-## تست و build
+مقادیر نمونه در `backend/.env.example`، `backend/.env.production.example` و `frontend/.env.example` قرار دارند.
+
+متغیرهای ضروری backend:
+
+- `SECRET_KEY`
+- `DATABASE_URL`
+- `ALLOWED_HOSTS`
+- `CORS_ALLOWED_ORIGINS`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_BOT_USERNAME` بدون `@`
+- `CRON_SECRET` برای endpoint زمان‌بندی
+
+متغیر ضروری frontend:
+
+- `VITE_API_URL`، برای نمونه `https://divar-car-finder-api.onrender.com/api`
+
+هیچ database password، service-role key، bot token، chat ID یا Django secret نباید commit شود.
+
+## اتصال تلگرام
+
+1. ربات را در BotFather بسازید.
+2. `TELEGRAM_BOT_TOKEN` و `TELEGRAM_BOT_USERNAME` را در secret manager backend قرار دهید.
+3. webhook را روی آدرس زیر تنظیم کنید:
+
+```text
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://YOUR_BACKEND/api/telegram/webhook/
+```
+
+4. کاربر در صفحه «اتصال تلگرام» روی دکمه اتصال می‌زند و ربات را Start می‌کند.
+
+توکن اتصال کاربر hash شده، ۱۵ دقیقه معتبر و یک‌بارمصرف است. اگر گزینه «ارسال عکس‌ها به‌صورت آلبوم» فعال باشد، backend تصاویر را دانلود و به‌صورت فایل multipart برای Telegram آپلود می‌کند؛ در نتیجه محدودیت URLهای CDN دیوار مانع ارسال نمی‌شود.
+
+## Crawling و matching
+
+- URL شهر فارسی قبل از درخواست به slug دیوار تبدیل می‌شود؛ برای نمونه `تهران → tehran`.
+- صفحه فهرست برای عنوان، قیمت، کارکرد و سال parse می‌شود.
+- فقط کاندیداهای اولیه منطبق، صفحه جزئیات را برای توضیحات، وضعیت شاسی/بدنه و تصاویر دریافت می‌کنند.
+- سال‌های میلادی مانند `2015` به سال شمسی متناظر تبدیل می‌شوند.
+- برند می‌تواند در عنوان حذف شده باشد؛ در صورت وجود مدل دقیق، برند جستجو قابل استنتاج است.
+- فیلد عددی خالی `null` است و در matching شرکت نمی‌کند.
+- خطا و شمارنده‌های هر اجرا در `CrawlRun` ذخیره می‌شوند.
+
+اجرای دستی از UI یا API:
+
+```text
+POST /api/searches/:id/run/
+```
+
+اجرای تمام جستجوهای موعدرسیده:
 
 ```bash
-cd backend && pytest
-cd frontend && npm test
-cd frontend && npm run build
+cd backend
+python manage.py crawl_due --sync
 ```
+
+## APIهای اصلی
+
+| Method | Path | کاربرد |
+|---|---|---|
+| `POST` | `/api/auth/login/` | دریافت JWT |
+| `POST` | `/api/auth/refresh/` | تمدید JWT |
+| `GET/POST` | `/api/searches/` | فهرست/ساخت جستجو |
+| `GET/PATCH/DELETE` | `/api/searches/:id/` | مشاهده/ویرایش/حذف جستجو |
+| `POST` | `/api/searches/:id/run/` | اجرای فوری جستجو |
+| `GET` | `/api/listings/` | آگهی‌های منطبق کاربر |
+| `POST` | `/api/listings/bulk-delete/` | حذف امن ارتباط آگهی‌های انتخابی با کاربر |
+| `GET` | `/api/crawl-runs/` | تاریخچه اجراها |
+| `GET` | `/api/telegram/status/` | وضعیت اتصال تلگرام |
+| `POST` | `/api/telegram/connect/` | ساخت deep-link اتصال |
+| `DELETE` | `/api/telegram/disconnect/` | قطع اتصال تلگرام |
+| `GET` | `/api/dashboard/summary/` | آمار داشبورد |
+| `GET` | `/api/health/` | سلامت سرویس |
+
+تمام queryها بر اساس کاربر احرازشده محدود می‌شوند. حذف گروهی فقط matchها و notificationهای همان کاربر را حذف می‌کند و آگهی مشترک کاربران دیگر را نگه می‌دارد.
+
+## تست و بررسی
+
+```bash
+cd backend
+DATABASE_URL=sqlite:///:memory: pytest
+python manage.py check
+
+cd ../frontend
+npm run build
+```
+
+در حال حاضر frontend فایل تست خودکار ندارد؛ `npm test` تا زمان اضافه‌شدن test file با پیام `No test files found` خارج می‌شود.
 
 ## Docker
-
-ابتدا `backend/.env` را بسازید و سپس:
 
 ```bash
 docker compose up --build
@@ -87,20 +204,19 @@ docker compose exec backend python manage.py migrate
 docker compose exec backend python manage.py createsuperuser
 ```
 
-پایگاه داده Supabase بیرون compose باقی می‌ماند. برای توسعه بدون Supabase، اگر `DATABASE_URL` خالی باشد SQLite استفاده می‌شود.
-
-## متغیرهای محیطی و امنیت
-
-نمونه کامل در فایل‌های `.env.example` است. `SECRET_KEY`، `DATABASE_URL`، `SUPABASE_SECRET_KEY` و `TELEGRAM_BOT_TOKEN` باید در secret manager میزبان ذخیره شوند. در production مقدار `DEBUG=false`، میزبان‌ها و CORS دقیق، HTTPS و webhook secret/reverse-proxy محدودشده توصیه می‌شود. کلیدهای `VITE_` عمومی هستند.
+اگر `DATABASE_URL` تنظیم نشود، backend برای توسعه از SQLite استفاده می‌کند.
 
 ## نگهداری parser دیوار
 
-درخواست زنده فقط در `crawler/divar.py` قرار دارد و CAPTCHA یا محدودیت فنی را دور نمی‌زند. اگر ساختار تغییر کرد، fixture HTML/JSON پاک‌سازی‌شده بسازید، ابتدا تست `DivarParser` را اصلاح کنید و بعد selector یا walker را تغییر دهید. خطای یک پاسخ در `CrawlRun.error_message` ثبت می‌شود و worker از کار نمی‌افتد. قبل از استقرار، شرایط استفاده، robots و نرخ مجاز دیوار را بررسی کنید.
+تمام منطق وابسته به دیوار در `backend/crawler/divar.py` قرار دارد. crawler CAPTCHA یا محدودیت فنی را دور نمی‌زند. هنگام تغییر HTML دیوار:
+
+1. یک fixture پاک‌سازی‌شده HTML/JSON بسازید.
+2. تست parser را به‌روزرسانی کنید.
+3. selector یا walker را اصلاح کنید.
+4. extraction زنده، `CrawlRun` و اعلان Telegram را بررسی کنید.
+
+پیش از استفاده production، شرایط استفاده، robots.txt و محدودیت نرخ دیوار را بررسی کنید.
 
 ## استقرار
 
-backend، worker و beat را از یک image روی Railway/Render/Fly/VPS اجرا کنید؛ Redis مدیریت‌شده و Supabase PostgreSQL را متصل کنید. frontend مستقل روی CDN یا image nginx قابل استقرار است. migration را به‌عنوان release command اجرا کنید. برای observability لاگ‌ها JSON-like و دارای شناسه run/profile/listing هستند؛ secretها log نمی‌شوند.
-
-در استقرار رایگان، Supabase Cron در دقیقه ۱۷ هر ساعت Edge Function به نام
-`trigger-crawl` را اجرا می‌کند. این تابع endpoint محافظت‌شده Render را صدا می‌زند؛
-`crawl_due --sync` و lock دیتابیس نیز جایگزین worker دائمی و Redis هستند.
+راهنمای کامل استقرار رایگان در [DEPLOY_FREE.md](DEPLOY_FREE.md) قرار دارد.
