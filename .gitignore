@@ -6,6 +6,7 @@ backend/.venv/
 .venv/
 celerybeat-schedule*
 *.tsbuildinfo
+supabase/.temp/
 backend/db.sqlite3
 backend/staticfiles/
 frontend/node_modules/
