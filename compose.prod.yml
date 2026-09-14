@@ -1,0 +1,92 @@
+name: carfinding
+services:
+  backend:
+    build: ./backend
+    image: carfinding-backend:latest
+    container_name: carfinding-backend
+    restart: unless-stopped
+    env_file: .env
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 90"
+    networks:
+      - web
+      - internal
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/', timeout=5)\" 2>/dev/null || wget -qO- http://127.0.0.1:8000/admin/ > /dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  worker:
+    build: ./backend
+    image: carfinding-backend:latest
+    container_name: carfinding-worker
+    restart: unless-stopped
+    env_file: .env
+    command: celery -A config worker -l info --concurrency 2
+    networks:
+      - internal
+    depends_on:
+      - redis
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  beat:
+    build: ./backend
+    image: carfinding-backend:latest
+    container_name: carfinding-beat
+    restart: unless-stopped
+    env_file: .env
+    command: celery -A config beat -l info
+    networks:
+      - internal
+    depends_on:
+      - redis
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: https://carfinding.ir/api
+    image: carfinding-frontend:latest
+    container_name: carfinding-frontend
+    restart: unless-stopped
+    networks:
+      - web
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  redis:
+    image: redis:7-alpine
+    container_name: carfinding-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+
+networks:
+  web:
+    external: true
+  internal:
+    driver: bridge
+
+volumes:
+  redis_data:
