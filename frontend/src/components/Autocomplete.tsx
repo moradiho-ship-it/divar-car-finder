@@ -7,6 +7,7 @@ type Props = {
   onSelect?: (v: string) => void;
   options: string[];
   placeholder?: string;
+  ariaLabel?: string;
   disabled?: boolean;
   allowCustom?: boolean;
 };
@@ -17,6 +18,7 @@ export function Autocomplete({
   onSelect,
   options,
   placeholder = 'انتخاب کنید',
+  ariaLabel,
   disabled,
   allowCustom = true,
 }: Props) {
@@ -43,11 +45,20 @@ export function Autocomplete({
           value={query}
           disabled={disabled}
           placeholder={placeholder}
+          aria-label={ariaLabel}
           onFocus={() => setOpen(true)}
           onChange={(e) => {
             setQuery(e.target.value);
             if (allowCustom) onChange(e.target.value);
             setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && onSelect && query.trim()) {
+              e.preventDefault();
+              onSelect(query);
+              setQuery('');
+              setOpen(false);
+            }
           }}
         />
         <button
@@ -102,11 +113,15 @@ export function MultiAutocomplete({
   onChange,
   options,
   placeholder,
+  disabled = false,
+  inputLabel,
 }: {
   values: string[];
   onChange: (v: string[]) => void;
   options: string[];
   placeholder: string;
+  disabled?: boolean;
+  inputLabel?: string;
 }) {
   const [draft, setDraft] = useState('');
   const add = (v: string) => {
@@ -118,12 +133,13 @@ export function MultiAutocomplete({
     <div>
       <div className="flex gap-2">
         <div className="flex-1">
-          <Autocomplete value={draft} options={options} placeholder={placeholder} onChange={setDraft} onSelect={add} />
+          <Autocomplete value={draft} options={options} placeholder={placeholder} ariaLabel={inputLabel} onChange={setDraft} onSelect={add} disabled={disabled} />
         </div>
         <button
           type="button"
           className="btn-secondary h-12 px-3"
           aria-label="افزودن"
+          disabled={disabled}
           onClick={() => add(draft)}
         >
           <Plus size={17} />
@@ -134,7 +150,7 @@ export function MultiAutocomplete({
           {values.map((x) => (
             <span key={x} className="chip-active chip">
               {x}
-              <button type="button" aria-label={`حذف ${x}`} onClick={() => onChange(values.filter((v) => v !== x))}>
+              <button type="button" aria-label={`حذف ${x}`} disabled={disabled} onClick={() => onChange(values.filter((v) => v !== x))}>
                 <X size={13} />
               </button>
             </span>

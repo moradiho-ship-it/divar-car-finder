@@ -1,5 +1,6 @@
 from dataclasses import asdict, dataclass
 from .types import NormalizedListing
+from .selection import selected_values
 @dataclass
 class MatchResult:
     matched: bool
@@ -18,6 +19,14 @@ def match_listing(profile, listing: NormalizedListing) -> MatchResult:
         matched[field] = ok
         if ok: points += weight
         elif hard: failed.append(field)
+    def any_exact(field, expected, actual, hard=True, weight=10):
+        nonlocal points, possible
+        if not expected: return
+        possible += weight
+        ok = bool(actual) and any(str(value).casefold() in str(actual).casefold() for value in expected)
+        matched[field] = ok
+        if ok: points += weight
+        elif hard: failed.append(field)
     def between(field, low, high, value, weight=12):
         nonlocal points, possible
         if low is None and high is None: return
@@ -26,13 +35,15 @@ def match_listing(profile, listing: NormalizedListing) -> MatchResult:
         matched[field] = ok
         if ok: points += weight
         else: failed.append(field)
+    models = selected_values(profile, "models", "model")
+    trims = selected_values(profile, "trims", "trim")
     model_actual = listing.model or listing.title
-    model_is_visible = bool(profile.model) and profile.model.casefold() in str(model_actual).casefold()
+    model_is_visible = any(str(model).casefold() in str(model_actual).casefold() for model in models)
     brand_actual = listing.brand or listing.title
     if profile.brand and model_is_visible and profile.brand.casefold() not in str(brand_actual).casefold():
         brand_actual = f"{profile.brand} {brand_actual}"
-    exact("brand", profile.brand, brand_actual); exact("model", profile.model, model_actual)
-    exact("trim", profile.trim, listing.trim or listing.title, False, 6)
+    exact("brand", profile.brand, brand_actual); any_exact("model", models, model_actual)
+    any_exact("trim", trims, listing.trim or listing.title, False, 6)
     between("year", profile.min_year, profile.max_year, listing.year); between("price", profile.min_price, profile.max_price, listing.price, 18)
     between("mileage", profile.min_mileage, profile.max_mileage, listing.mileage)
     if profile.cities: exact("city", "|".join(profile.cities), listing.city, False, 8); matched["city"] = listing.city in profile.cities if listing.city else False

@@ -44,8 +44,8 @@ const schema = z
   .object({
     title: z.string().min(2, 'نام جستجو را وارد کنید'),
     brand: z.string(),
-    model: z.string(),
-    trim: z.string(),
+    models: z.array(z.string()),
+    trims: z.array(z.string()),
     min_year: optionalNumber,
     max_year: optionalNumber,
     min_price: optionalNumber,
@@ -75,8 +75,8 @@ type Form = z.infer<typeof schema>;
 const defaults: Form = {
   title: '',
   brand: '',
-  model: '',
-  trim: '',
+  models: [],
+  trims: [],
   min_year: null,
   max_year: null,
   min_price: null,
@@ -183,7 +183,7 @@ function Auto({
   control,
   setValue,
 }: {
-  name: 'brand' | 'model' | 'trim' | 'transmission' | 'body_condition';
+  name: 'brand' | 'transmission' | 'body_condition';
   label: string;
   options: string[];
   disabled?: boolean;
@@ -202,10 +202,9 @@ function Auto({
             onChange={(v) => {
               field.onChange(v);
               if (name === 'brand') {
-                setValue('model', '');
-                setValue('trim', '');
+                setValue('models', []);
+                setValue('trims', []);
               }
-              if (name === 'model') setValue('trim', '');
             }}
             options={options}
             disabled={disabled}
@@ -226,16 +225,18 @@ export default function SearchFormPage() {
     control,
     watch,
     setValue,
+    getValues,
     setError,
     formState: { errors },
   } = useForm<Form>({ resolver: zodResolver(schema), defaultValues: defaults });
 
   const brand = watch('brand');
-  const model = watch('model');
+  const models = watch('models');
+  const trimOptions = [...new Set(models.flatMap((model) => TRIMS_BY_BRAND_AND_MODEL[brand]?.[model] ?? []))];
   const values = watch();
 
   const filterCount = [
-    values.brand, values.model, values.trim, values.min_year, values.max_year,
+    values.brand, values.models.length, values.trims.length, values.min_year, values.max_year,
     values.min_price, values.max_price, values.max_mileage, values.transmission,
     values.body_condition, values.cities.length, values.districts.length,
     values.colors.length, values.description_keywords,
@@ -255,6 +256,8 @@ export default function SearchFormPage() {
       const { data } = await api.get<SearchProfile>(`/searches/${id}/`);
       reset({
         ...data,
+        models: data.models?.length ? data.models : data.model ? [data.model] : [],
+        trims: data.trims?.length ? data.trims : data.trim ? [data.trim] : [],
         districts: data.districts ?? [],
         description_keywords: data.description_keywords.join('\n'),
         excluded_keywords: data.excluded_keywords.join('\n'),
@@ -315,8 +318,46 @@ export default function SearchFormPage() {
             <div className="grid gap-5 sm:grid-cols-2">
               <Field name="title" label="نام جستجو" placeholder="مثلاً پژو ۲۰۷ اتوماتیک تهران" register={register} errors={errors} />
               <Auto name="brand" label="برند" options={BRAND_OPTIONS} control={control} setValue={setValue} />
-              <Auto name="model" label="مدل" options={MODELS_BY_BRAND[brand] ?? []} disabled={!brand} control={control} setValue={setValue} />
-              <Auto name="trim" label="تیپ" options={TRIMS_BY_BRAND_AND_MODEL[brand]?.[model] ?? []} disabled={!model} control={control} setValue={setValue} />
+              <div className="block">
+                <span className="label">مدل‌ها</span>
+                <Controller
+                  name="models"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiAutocomplete
+                      key={brand}
+                      values={field.value}
+                      onChange={(selected) => {
+                        field.onChange(selected);
+                        const allowed = new Set(selected.flatMap((model) => TRIMS_BY_BRAND_AND_MODEL[brand]?.[model] ?? []));
+                        setValue('trims', getValues('trims').filter((trim) => allowed.has(trim)));
+                      }}
+                      options={MODELS_BY_BRAND[brand] ?? []}
+                      placeholder="جستجو و افزودن مدل"
+                      inputLabel="مدل‌ها"
+                      disabled={!brand}
+                    />
+                  )}
+                />
+              </div>
+              <div className="block">
+                <span className="label">تیپ‌ها</span>
+                <Controller
+                  name="trims"
+                  control={control}
+                  render={({ field }) => (
+                    <MultiAutocomplete
+                      key={`${brand}:${models.join('|')}`}
+                      values={field.value}
+                      onChange={field.onChange}
+                      options={trimOptions}
+                      placeholder="جستجو و افزودن تیپ"
+                      inputLabel="تیپ‌ها"
+                      disabled={!models.length}
+                    />
+                  )}
+                />
+              </div>
               <label className="block">
                 <span className="label">حداقل سال</span>
                 <Controller
@@ -460,7 +501,7 @@ export default function SearchFormPage() {
                 <Sparkles size={15} className="text-[rgb(var(--gold))]" /> در حال جستجوی
               </div>
               <p className="relative mt-2 text-lg font-bold">
-                {[values.brand, values.model, values.trim].filter(Boolean).join(' ') || 'همه خودروها'}
+                {[values.brand, values.models.join('، '), values.trims.join('، ')].filter(Boolean).join(' · ') || 'همه خودروها'}
               </p>
             </div>
 

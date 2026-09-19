@@ -1,10 +1,12 @@
 import json, logging, random, re, time
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urlencode
 import httpx
 from bs4 import BeautifulSoup
 from searches.models import SearchProfile
 from .providers import ListingProvider
+from .selection import selected_values
 from .types import NormalizedListing
 logger = logging.getLogger(__name__)
 
@@ -12,13 +14,21 @@ DIVAR_CITY_SLUGS = json.loads(Path(__file__).with_name("divar_cities.json").read
 
 class DivarURLBuilder:
     BASE = "https://divar.ir/s/{city}/car"
-    def build(self, profile: SearchProfile) -> str:
+    def build(self, profile: SearchProfile, model: Optional[str] = None) -> str:
         selected_city = (profile.cities or ["تهران"])[0].strip()
         city = DIVAR_CITY_SLUGS.get(selected_city, selected_city.lower())
-        params = {"q": " ".join(x for x in (profile.brand, profile.model, profile.trim) if x)}
+        models = selected_values(profile, "models", "model")
+        trims = selected_values(profile, "trims", "trim")
+        if model is None:
+            model = models[0] if models else ""
+        trim = trims[0] if len(models) <= 1 and len(trims) == 1 else ""
+        params = {"q": " ".join(x for x in (profile.brand, model, trim) if x)}
         if profile.min_price is not None: params["price"] = f"{profile.min_price}-"
         if profile.max_price is not None: params["price"] = f"{profile.min_price or 0}-{profile.max_price}"
         return f"{self.BASE.format(city=city)}?{urlencode(params)}"
+
+    def build_many(self, profile: SearchProfile) -> list[str]:
+        return [self.build(profile, model) for model in (selected_values(profile, "models", "model") or [""])]
 
 class DivarParser:
     def parse(self, html: str) -> list[NormalizedListing]:
@@ -93,20 +103,21 @@ class DivarListingProvider(ListingProvider):
         self.client = client or httpx.Client(timeout=15, follow_redirects=True, headers={"User-Agent": "DivarCarFinder/1.0 (respectful personal notifier)"})
         self.parser = DivarParser(); self.urls = DivarURLBuilder()
     def search(self, profile):
-        time.sleep(random.uniform(.4, 1.2))
-        for attempt in range(3):
-            try:
-                response = self.client.get(self.urls.build(profile)); response.raise_for_status()
-                if "text/html" not in response.headers.get("content-type", ""): raise ValueError("Unexpected Divar response")
-                listings = self.parser.parse(response.text)
-                selected_city = (profile.cities or ["تهران"])[0]
-                for listing in listings:
-                    if not listing.city: listing.city = selected_city
-                return listings
-            except (httpx.HTTPError, ValueError) as exc:
-                if attempt == 2: raise
-                logger.warning("provider_retry attempt=%s error=%s", attempt + 1, type(exc).__name__); time.sleep(2 ** attempt)
-        return []
+        found = {}
+        for url in self.urls.build_many(profile):
+            time.sleep(random.uniform(.4, 1.2))
+            for attempt in range(3):
+                try:
+                    response = self.client.get(url); response.raise_for_status()
+                    if "text/html" not in response.headers.get("content-type", ""): raise ValueError("Unexpected Divar response")
+                    for listing in self.parser.parse(response.text):
+                        if not listing.city: listing.city = (profile.cities or ["تهران"])[0]
+                        found[listing.external_id] = listing
+                    break
+                except (httpx.HTTPError, ValueError) as exc:
+                    if attempt == 2: raise
+                    logger.warning("provider_retry attempt=%s error=%s", attempt + 1, type(exc).__name__); time.sleep(2 ** attempt)
+        return list(found.values())
 
     def enrich(self, listing: NormalizedListing) -> NormalizedListing:
         """Load fields that Divar only exposes on the individual post page."""

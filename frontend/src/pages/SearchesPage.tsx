@@ -69,7 +69,11 @@ export default function SearchesPage() {
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {data.results.map((p, i) => {
-            const spec = [p.brand, p.model, p.trim].filter(Boolean).join(' ') || 'همه خودروها';
+            const spec = [
+              p.brand,
+              (p.models?.length ? p.models : p.model ? [p.model] : []).join('، '),
+              (p.trims?.length ? p.trims : p.trim ? [p.trim] : []).join('، '),
+            ].filter(Boolean).join(' · ') || 'همه خودروها';
             return (
               <article
                 key={p.id}

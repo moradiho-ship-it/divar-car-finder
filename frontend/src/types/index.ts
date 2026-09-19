@@ -5,6 +5,8 @@ export interface SearchProfile {
   brand: string;
   model: string;
   trim: string;
+  models: string[];
+  trims: string[];
   min_year: number | null;
   max_year: number | null;
   min_price: number | null;

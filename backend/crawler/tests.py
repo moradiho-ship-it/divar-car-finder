@@ -59,6 +59,41 @@ def test_model_name_can_infer_omitted_brand():
     listing = NormalizedListing("x", "اسپورتیج ۲۰۱۵ فول", "https://example.com", price=5_000_000_000, year=1394, city="تهران")
     assert match_listing(P(), listing).matched
 
+
+def test_multiple_models_and_trims_match_any_selected_value():
+    class P:
+        brand = "پژو"; models = ["206", "207i"]; trims = ["تیپ ۲", "اتوماتیک MC"]
+        model = trim = ""; min_year = max_year = min_price = max_price = None
+        min_mileage = max_mileage = None; cities = []; colors = []
+        transmission = body_condition = ""; description_keywords = excluded_keywords = []
+        minimum_match_score = 0
+    matched = match_listing(P(), NormalizedListing("x", "پژو 207i اتوماتیک MC", "https://example.com"))
+    rejected = match_listing(P(), NormalizedListing("y", "پژو 405", "https://example.com"))
+    assert matched.matched and matched.matched_fields["model"] and matched.matched_fields["trim"]
+    assert not rejected.matched and "model" in rejected.failed_fields
+
+
+def test_multiple_models_generate_separate_searches_and_deduplicate(monkeypatch):
+    class P:
+        cities = ["تهران"]; brand = "پژو"; models = ["206", "207i"]
+        trims = ["تیپ ۲", "اتوماتیک MC"]; model = trim = ""
+        min_price = max_price = None
+    class Response:
+        headers = {"content-type": "text/html"}
+        text = '<a href="/v/test/same"><h2>پژو 206</h2></a>'
+        def raise_for_status(self): pass
+    class Client:
+        def __init__(self): self.urls = []
+        def get(self, url):
+            self.urls.append(url)
+            return Response()
+    monkeypatch.setattr("crawler.divar.time.sleep", lambda _: None)
+    client = Client()
+    results = DivarListingProvider(client).search(P())
+    assert len(client.urls) == 2
+    assert "206" in client.urls[0] and "207i" in client.urls[1]
+    assert len(results) == 1
+
 def test_divar_detail_extracts_chassis_and_body():
     class Response:
         text = '<div class="kt-base-row"><p class="kt-score-row__title">وضعیت شاسی‌ها</p><div class="kt-score-row__score">سالم و پلمپ</div></div><div class="kt-base-row"><p class="kt-score-row__title">بدنه</p><div class="kt-score-row__score">سالم و بی‌خط و خش</div></div><h2 class="kt-title-row__title">توضیحات</h2><div><p class="kt-description-row__text">خودرو کاملاً سالم است.\nسند تک‌برگ.</p></div>'
