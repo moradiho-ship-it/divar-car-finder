@@ -33,7 +33,7 @@ export function Autocomplete({
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  const filtered = options.filter((x) => x.includes(query.trim())).slice(0, 60);
+  const filtered = options.filter((x) => x.toLocaleLowerCase('fa').includes(query.trim().toLocaleLowerCase('fa')));
 
   return (
     <div ref={ref} className="relative">

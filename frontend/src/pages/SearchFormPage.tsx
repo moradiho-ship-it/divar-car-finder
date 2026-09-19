@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import type { AxiosError } from 'axios';
 import type { ReactNode } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import type { Control, FieldErrors, UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { z } from 'zod';
 import {
@@ -30,7 +31,7 @@ import {
   PRICE_SUGGESTIONS,
   TEHRAN_DISTRICTS,
   TRANSMISSIONS,
-  TRIMS_BY_MODEL,
+  TRIMS_BY_BRAND_AND_MODEL,
   YEARS,
 } from '../data/vehicleOptions';
 
@@ -132,6 +133,89 @@ function Section({
   );
 }
 
+/* Keep field component identities stable while the live summary updates. */
+function Field({
+  name,
+  label,
+  type = 'text',
+  suggestions = [],
+  placeholder,
+  register,
+  errors,
+}: {
+  name: keyof Form;
+  label: string;
+  type?: string;
+  suggestions?: number[];
+  placeholder?: string;
+  register: UseFormRegister<Form>;
+  errors: FieldErrors<Form>;
+}) {
+  const listId = `suggest-${String(name)}`;
+  return (
+    <label className="block">
+      <span className="label">{label}</span>
+      <input
+        type={type}
+        inputMode={type === 'number' ? 'numeric' : undefined}
+        placeholder={placeholder}
+        list={suggestions.length ? listId : undefined}
+        className="field"
+        {...register(name)}
+      />
+      {suggestions.length > 0 && (
+        <datalist id={listId}>
+          {suggestions.map((x) => (
+            <option key={x} value={x} />
+          ))}
+        </datalist>
+      )}
+      {errors[name] && <small className="field-error">{errors[name]?.message as string}</small>}
+    </label>
+  );
+}
+
+function Auto({
+  name,
+  label,
+  options,
+  disabled = false,
+  control,
+  setValue,
+}: {
+  name: 'brand' | 'model' | 'trim' | 'transmission' | 'body_condition';
+  label: string;
+  options: string[];
+  disabled?: boolean;
+  control: Control<Form>;
+  setValue: UseFormSetValue<Form>;
+}) {
+  return (
+    <label className="block">
+      <span className="label">{label}</span>
+      <Controller
+        name={name}
+        control={control}
+        render={({ field }) => (
+          <Autocomplete
+            value={field.value}
+            onChange={(v) => {
+              field.onChange(v);
+              if (name === 'brand') {
+                setValue('model', '');
+                setValue('trim', '');
+              }
+              if (name === 'model') setValue('trim', '');
+            }}
+            options={options}
+            disabled={disabled}
+          />
+        )}
+      />
+    </label>
+  );
+}
+
 export default function SearchFormPage() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -206,80 +290,6 @@ export default function SearchFormPage() {
     },
   });
 
-  /* Text / number field with optional datalist suggestions */
-  const Field = ({
-    name,
-    label,
-    type = 'text',
-    suggestions = [],
-    placeholder,
-  }: {
-    name: keyof Form;
-    label: string;
-    type?: string;
-    suggestions?: number[];
-    placeholder?: string;
-  }) => {
-    const listId = `suggest-${String(name)}`;
-    return (
-      <label className="block">
-        <span className="label">{label}</span>
-        <input
-          type={type}
-          inputMode={type === 'number' ? 'numeric' : undefined}
-          placeholder={placeholder}
-          list={suggestions.length ? listId : undefined}
-          className="field"
-          {...register(name)}
-        />
-        {suggestions.length > 0 && (
-          <datalist id={listId}>
-            {suggestions.map((x) => (
-              <option key={x} value={x} />
-            ))}
-          </datalist>
-        )}
-        {errors[name] && <small className="field-error">{errors[name]?.message as string}</small>}
-      </label>
-    );
-  };
-
-  /* Autocomplete-backed field with brand→model→trim cascade reset */
-  const Auto = ({
-    name,
-    label,
-    options,
-    disabled = false,
-  }: {
-    name: 'brand' | 'model' | 'trim' | 'transmission' | 'body_condition';
-    label: string;
-    options: string[];
-    disabled?: boolean;
-  }) => (
-    <label className="block">
-      <span className="label">{label}</span>
-      <Controller
-        name={name}
-        control={control}
-        render={({ field }) => (
-          <Autocomplete
-            value={field.value}
-            onChange={(v) => {
-              field.onChange(v);
-              if (name === 'brand') {
-                setValue('model', '');
-                setValue('trim', '');
-              }
-              if (name === 'model') setValue('trim', '');
-            }}
-            options={options}
-            disabled={disabled}
-          />
-        )}
-      />
-    </label>
-  );
-
   const toggles: { name: 'telegram_enabled' | 'notify_once' | 'send_images'; label: string }[] = [
     { name: 'telegram_enabled', label: 'اعلان تلگرام فعال باشد' },
     { name: 'notify_once', label: 'هر آگهی فقط یک‌بار ارسال شود' },
@@ -303,10 +313,10 @@ export default function SearchFormPage() {
         <div className="space-y-6">
           <Section step={1} icon={CarFront} title="اطلاعات پایه خودرو">
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field name="title" label="نام جستجو" placeholder="مثلاً پژو ۲۰۷ اتوماتیک تهران" />
-              <Auto name="brand" label="برند" options={BRAND_OPTIONS} />
-              <Auto name="model" label="مدل" options={MODELS_BY_BRAND[brand] ?? []} disabled={!brand} />
-              <Auto name="trim" label="تیپ" options={TRIMS_BY_MODEL[model] ?? []} disabled={!model} />
+              <Field name="title" label="نام جستجو" placeholder="مثلاً پژو ۲۰۷ اتوماتیک تهران" register={register} errors={errors} />
+              <Auto name="brand" label="برند" options={BRAND_OPTIONS} control={control} setValue={setValue} />
+              <Auto name="model" label="مدل" options={MODELS_BY_BRAND[brand] ?? []} disabled={!brand} control={control} setValue={setValue} />
+              <Auto name="trim" label="تیپ" options={TRIMS_BY_BRAND_AND_MODEL[brand]?.[model] ?? []} disabled={!model} control={control} setValue={setValue} />
               <label className="block">
                 <span className="label">حداقل سال</span>
                 <Controller
@@ -342,10 +352,10 @@ export default function SearchFormPage() {
 
           <Section step={2} icon={WalletCards} title="قیمت و کارکرد">
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field name="min_price" label="حداقل قیمت (تومان)" type="number" suggestions={PRICE_SUGGESTIONS} />
-              <Field name="max_price" label="حداکثر قیمت (تومان)" type="number" suggestions={PRICE_SUGGESTIONS} />
-              <Field name="min_mileage" label="حداقل کارکرد" type="number" suggestions={MILEAGE_SUGGESTIONS} />
-              <Field name="max_mileage" label="حداکثر کارکرد" type="number" suggestions={MILEAGE_SUGGESTIONS} />
+              <Field name="min_price" label="حداقل قیمت (تومان)" type="number" suggestions={PRICE_SUGGESTIONS} register={register} errors={errors} />
+              <Field name="max_price" label="حداکثر قیمت (تومان)" type="number" suggestions={PRICE_SUGGESTIONS} register={register} errors={errors} />
+              <Field name="min_mileage" label="حداقل کارکرد" type="number" suggestions={MILEAGE_SUGGESTIONS} register={register} errors={errors} />
+              <Field name="max_mileage" label="حداکثر کارکرد" type="number" suggestions={MILEAGE_SUGGESTIONS} register={register} errors={errors} />
               {errors.max_price && <small className="field-error -mt-3">{errors.max_price.message}</small>}
             </div>
           </Section>
@@ -382,8 +392,8 @@ export default function SearchFormPage() {
                   )}
                 />
               </label>
-              <Auto name="transmission" label="نوع گیربکس" options={TRANSMISSIONS} />
-              <Auto name="body_condition" label="وضعیت بدنه" options={BODY_CONDITIONS} />
+              <Auto name="transmission" label="نوع گیربکس" options={TRANSMISSIONS} control={control} setValue={setValue} />
+              <Auto name="body_condition" label="وضعیت بدنه" options={BODY_CONDITIONS} control={control} setValue={setValue} />
             </div>
           </Section>
 
@@ -402,8 +412,8 @@ export default function SearchFormPage() {
 
           <Section step={5} icon={BellRing} title="اعلان و زمان‌بندی">
             <div className="grid gap-5 sm:grid-cols-2">
-              <Field name="minimum_match_score" label="حداقل امتیاز تطابق (۰ تا ۱۰۰)" type="number" />
-              <Field name="crawl_interval_minutes" label="فاصله بررسی (دقیقه)" type="number" />
+              <Field name="minimum_match_score" label="حداقل امتیاز تطابق (۰ تا ۱۰۰)" type="number" register={register} errors={errors} />
+              <Field name="crawl_interval_minutes" label="فاصله بررسی (دقیقه)" type="number" register={register} errors={errors} />
             </div>
             <div className="mt-5 space-y-3">
               {toggles.map(({ name, label }) => (

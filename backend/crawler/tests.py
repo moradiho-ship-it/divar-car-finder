@@ -26,6 +26,8 @@ def test_divar_url_uses_city_slug():
     url = DivarURLBuilder().build(P())
     assert url.startswith("https://divar.ir/s/tehran/car?")
     assert "%D8%AA%D9%87%D8%B1%D8%A7%D9%86" not in url
+    P.cities = ["زاهدان"]
+    assert DivarURLBuilder().build(P()).startswith("https://divar.ir/s/zahedan/car?")
 
 def test_divar_parser_extracts_card_fields():
     payload = {"token": "abc", "title": "رنو ساندرو اتوماتیک ۱۳۹۷", "middle_description_text": "۱,۸۰۰,۰۰۰,۰۰۰ تومان", "top_description_text": "۸۵,۰۰۰ کیلومتر", "action": {"payload": {"web_info": {"city_persian": "تهران", "district_persian": "پونک"}}}}

@@ -1,4 +1,5 @@
 import json, logging, random, re, time
+from pathlib import Path
 from urllib.parse import urlencode
 import httpx
 from bs4 import BeautifulSoup
@@ -7,15 +8,7 @@ from .providers import ListingProvider
 from .types import NormalizedListing
 logger = logging.getLogger(__name__)
 
-DIVAR_CITY_SLUGS = {
-    "تهران": "tehran", "کرج": "karaj", "مشهد": "mashhad", "اصفهان": "isfahan",
-    "شیراز": "shiraz", "تبریز": "tabriz", "قم": "qom", "اهواز": "ahvaz",
-    "رشت": "rasht", "ارومیه": "urmia", "کرمان": "kerman", "یزد": "yazd",
-    "قزوین": "qazvin", "همدان": "hamedan", "ساری": "sari", "گرگان": "gorgan",
-    "بندرعباس": "bandar-abbas", "اراک": "arak", "زنجان": "zanjan",
-    "اردبیل": "ardabil", "سنندج": "sanandaj", "کرمانشاه": "kermanshah",
-    "بوشهر": "bushehr", "خرم‌آباد": "khorramabad", "کاشان": "kashan",
-}
+DIVAR_CITY_SLUGS = json.loads(Path(__file__).with_name("divar_cities.json").read_text(encoding="utf-8"))
 
 class DivarURLBuilder:
     BASE = "https://divar.ir/s/{city}/car"
