@@ -1,3 +1,4 @@
+import os
 from django.db import connection
 from django.db.models import Count
 from django.utils import timezone
@@ -13,7 +14,7 @@ class HealthView(APIView):
     def get(self, request):
         try:
             with connection.cursor() as cursor: cursor.execute("SELECT 1")
-            return Response({"status": "ok", "database": "ok"})
+            return Response({"status": "ok", "database": "ok", "release": os.getenv("RENDER_GIT_COMMIT", "")[:12]})
         except Exception: return Response({"status": "degraded", "database": "error"}, status=503)
 class DashboardSummaryView(APIView):
     def get(self, request):

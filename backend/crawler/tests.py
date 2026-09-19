@@ -1,6 +1,10 @@
 import pytest
+from datetime import timedelta
+from django.utils import timezone
 from accounts.models import User
 from searches.models import SearchProfile
+from .models import CrawlRun
+from .services import claim_crawl
 from .matching import match_listing
 from .divar import DivarListingProvider, DivarParser, DivarURLBuilder
 from .types import NormalizedListing
@@ -11,6 +15,19 @@ def test_hard_ranges_and_keywords_match():
     item = NormalizedListing("x", "Toyota Camry", "https://divar.ir/v/-/x", price=2_000_000_000, year=2020, description="سانروف", brand="Toyota", model="Camry")
     result = match_listing(p, item)
     assert result.matched and result.score >= 60
+
+
+@pytest.mark.django_db
+def test_stale_crawl_does_not_block_future_runs():
+    user = User.objects.create_user(username="stale", email="stale@example.com", password="password123")
+    profile = SearchProfile.objects.create(user=user, title="test")
+    stale = CrawlRun.objects.create(search_profile=profile)
+    CrawlRun.objects.filter(pk=stale.pk).update(started_at=timezone.now() - timedelta(minutes=20))
+    fresh = claim_crawl(profile)
+    stale.refresh_from_db()
+    assert stale.status == "failed"
+    assert fresh.status == "running"
+    assert claim_crawl(profile) is None
 def test_excluded_keyword_rejects():
     class P: brand=""; model=""; trim=""; min_year=max_year=min_price=max_price=min_mileage=max_mileage=None; cities=[]; colors=[]; transmission=""; body_condition=""; description_keywords=[]; excluded_keywords=["تصادفی"]; minimum_match_score=0
     assert not match_listing(P(), NormalizedListing("x", "خودرو تصادفی", "https://example.com")).matched

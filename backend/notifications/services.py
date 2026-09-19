@@ -1,4 +1,5 @@
 import json, logging
+from datetime import timedelta
 import httpx
 from django.conf import settings
 from django.utils import timezone
@@ -56,3 +57,22 @@ class TelegramService:
             response_text = getattr(locals().get("response"), "text", "")
             notification.status = "failed"; notification.error_message = f"{exc}: {response_text}"[:1000]; notification.retry_count += 1; logger.warning("telegram_failed listing_id=%s", listing.id)
         notification.save(); return notification
+
+
+def replay_recent_matches(profile):
+    """Retry a few recent matches after Telegram is connected or recovers."""
+    if not profile.telegram_enabled or not settings.TELEGRAM_BOT_TOKEN:
+        return
+    if not TelegramConnection.objects.filter(user=profile.user, is_verified=True).exists():
+        return
+    from listings.models import SearchMatch
+
+    recent = SearchMatch.objects.filter(
+        search_profile=profile, detected_at__gte=timezone.now() - timedelta(days=7)
+    ).select_related("listing").order_by("-detected_at")[:5]
+    service = TelegramService()
+    for match in recent:
+        notification = Notification.objects.filter(user=profile.user, listing=match.listing, channel="telegram").first()
+        if notification and (notification.status == "sent" or notification.retry_count >= 3):
+            continue
+        service.notify(profile, match.listing, match)

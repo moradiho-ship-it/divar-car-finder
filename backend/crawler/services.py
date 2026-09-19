@@ -1,8 +1,9 @@
 import logging
+from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 from listings.models import Listing, SearchMatch
-from notifications.services import TelegramService
+from notifications.services import TelegramService, replay_recent_matches
 from .models import CrawlRun
 from .matching import match_listing
 logger = logging.getLogger(__name__)
@@ -12,6 +13,10 @@ def claim_crawl(profile):
     from searches.models import SearchProfile
     with transaction.atomic():
         locked = SearchProfile.objects.select_for_update().get(pk=profile.pk)
+        now = timezone.now()
+        locked.crawl_runs.filter(status="running", started_at__lt=now - timedelta(minutes=15)).update(
+            status="failed", finished_at=now, error_message="Crawl timed out before completion"
+        )
         if locked.crawl_runs.filter(status="running").exists():
             return None
         return CrawlRun.objects.create(search_profile=locked)
@@ -21,6 +26,7 @@ def execute_crawl(profile, provider, run=None):
     if run is None:
         return None
     try:
+        replay_recent_matches(profile)
         normalized = list(provider.search(profile)); new_count = match_count = 0
         for item in normalized:
             result = match_listing(profile, item)
