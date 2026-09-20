@@ -9,6 +9,9 @@ load_dotenv(BASE_DIR / ".env")
 SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-development-only-key")
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 ALLOWED_HOSTS = [x for x in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if x]
+CSRF_TRUSTED_ORIGINS = [
+    x for x in os.getenv("CSRF_TRUSTED_ORIGINS", "https://carfinding.ir,https://www.carfinding.ir").split(",") if x
+]
 INSTALLED_APPS = [
     "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
     "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",

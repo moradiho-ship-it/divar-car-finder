@@ -1,0 +1,21 @@
+name: carfinding
+
+# The API, crawler, and Telegram sender run on Render. Mobin only serves the UI.
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    image: carfinding-frontend:latest
+    container_name: carfinding-frontend
+    restart: unless-stopped
+    networks:
+      - web
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  web:
+    external: true

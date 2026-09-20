@@ -4,9 +4,10 @@
 
 ## نسخه آنلاین
 
-- داشبورد: <https://divar-car-finder-web.onrender.com>
-- API: <https://divar-car-finder-api.onrender.com/api/>
-- Health check: <https://divar-car-finder-api.onrender.com/api/health/>
+- داشبورد: <https://carfinding.ir>
+- API از همان دامنه: <https://carfinding.ir/api/>
+- Health check: <https://carfinding.ir/api/health/>
+- API خارجی: <https://carfinding-api-free-hm.onrender.com/api/>
 - مخزن: <https://github.com/moradiho-ship-it/divar-car-finder>
 
 سرویس‌های رایگان Render ممکن است پس از مدتی عدم استفاده sleep شوند؛ اولین درخواست می‌تواند حدود یک دقیقه طول بکشد.
@@ -31,7 +32,7 @@
 
 ```text
 Browser
-  └─ React static site (Render)
+  └─ carfinding.ir (Mobin VPS: React + Caddy reverse proxy)
        └─ Django REST API (Render Free)
             ├─ Supabase PostgreSQL
             ├─ Divar listing/detail pages
@@ -219,4 +220,6 @@ docker compose exec backend python manage.py createsuperuser
 
 ## استقرار
 
-راهنمای کامل استقرار رایگان در [DEPLOY_FREE.md](DEPLOY_FREE.md) قرار دارد.
+راهنمای استقرار فرانت‌اند روی Mobin و بک‌اند روی Render در
+[deploy/mobin/README.md](deploy/mobin/README.md) قرار دارد.
+جزئیات استقرار اولیه Render و Supabase در [DEPLOY_FREE.md](DEPLOY_FREE.md) است.

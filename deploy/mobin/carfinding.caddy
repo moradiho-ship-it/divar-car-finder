@@ -1,0 +1,34 @@
+carfinding.ir, www.carfinding.ir {
+    # Mobin DNS resolves onrender.com to a non-routable address. These are
+    # Render's public ingress addresses, with TLS still verified for the API host.
+    @backend path /api/* /admin/* /static/*
+    handle @backend {
+        reverse_proxy 216.24.57.16:443 216.24.57.18:443 {
+            lb_policy first
+            lb_try_duration 8s
+            fail_duration 30s
+            header_up Host carfinding-api-free-hm.onrender.com
+            transport http {
+                tls
+                tls_server_name carfinding-api-free-hm.onrender.com
+                dial_timeout 5s
+                response_header_timeout 100s
+                keepalive off
+                versions 1.1
+            }
+        }
+    }
+
+    handle {
+        reverse_proxy carfinding-frontend:80
+    }
+
+    encode gzip
+
+    log {
+        output file /var/log/caddy/carfinding.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}
