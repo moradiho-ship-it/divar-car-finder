@@ -1,6 +1,10 @@
-# Free deployment: Render + Supabase
+# Original free deployment: Render + Supabase
 
-Production currently uses:
+The current primary frontend is `https://carfinding.ir` on Mobin VPS, with
+`/api` proxied to the Render backend. See [deploy/mobin/README.md](deploy/mobin/README.md)
+for the current frontend deployment. The Render frontend below remains a fallback.
+
+The original deployment uses:
 
 - Render Web Service for Django API
 - Render Static Site for React
@@ -8,7 +12,7 @@ Production currently uses:
 - Supabase Edge Functions + pg_cron/pg_net for hourly crawling
 - Telegram Bot API for notifications
 
-Cloudflare Pages remains an optional frontend target, but `pages.dev` may be blocked by some networks. The documented primary frontend is Render.
+Cloudflare Pages remains an optional frontend target, but `pages.dev` may be blocked by some networks.
 
 ## 1. Supabase database
 
