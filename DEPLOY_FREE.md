@@ -1,7 +1,7 @@
 # Original free deployment: Render + Supabase
 
 The current primary frontend is `https://carfinding.ir` on Mobin VPS, with
-`/api` proxied to the Render backend. See [deploy/mobin/README.md](deploy/mobin/README.md)
+`/api` relayed through a Supabase Edge Function to the Render backend. See [deploy/mobin/README.md](deploy/mobin/README.md)
 for the current frontend deployment. The Render frontend below remains a fallback.
 
 The original deployment uses:

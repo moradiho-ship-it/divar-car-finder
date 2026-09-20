@@ -33,7 +33,8 @@
 ```text
 Browser
   └─ carfinding.ir (Mobin VPS: React + Caddy reverse proxy)
-       └─ Django REST API (Render Free)
+       └─ Supabase Edge Function (API relay)
+            └─ Django REST API (Render Free)
             ├─ Supabase PostgreSQL
             ├─ Divar listing/detail pages
             └─ Telegram Bot API

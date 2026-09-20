@@ -1,11 +1,27 @@
 carfinding.ir, www.carfinding.ir {
-    # Mobin DNS resolves onrender.com to a non-routable address. These are
-    # Render's public ingress addresses, with TLS still verified for the API host.
-    @backend path /api/* /admin/* /static/*
+    # Supabase's Edge Function relays API traffic to Render from outside Iran.
+    @api path /api/*
+    handle @api {
+        rewrite * /functions/v1/render-proxy{uri}
+        reverse_proxy https://fypqnukqbxgnmpzojbna.supabase.co {
+            import /etc/caddy/sites/carfinding-proxy-secret.txt
+            transport http {
+                dial_timeout 5s
+                response_header_timeout 140s
+                keepalive 20s
+                versions 1.1
+            }
+        }
+    }
+
+    # The Django admin and static files still use Render's public ingress IPs.
+    # Mobin DNS resolves onrender.com to a non-routable address.
+    @backend path /admin/* /static/*
     handle @backend {
         reverse_proxy 216.24.57.16:443 216.24.57.18:443 {
             lb_policy first
-            lb_try_duration 8s
+            lb_retries 2
+            lb_try_duration 60s
             fail_duration 30s
             header_up Host carfinding-api-free-hm.onrender.com
             transport http {
@@ -13,7 +29,7 @@ carfinding.ir, www.carfinding.ir {
                 tls_server_name carfinding-api-free-hm.onrender.com
                 dial_timeout 5s
                 response_header_timeout 100s
-                keepalive off
+                keepalive 20s
                 versions 1.1
             }
         }

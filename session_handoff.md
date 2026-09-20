@@ -10,13 +10,14 @@ Updated: 2026-09-20 (Asia/Tehran)
 - Primary frontend: https://carfinding.ir (Mobin VPS, React container and Caddy).
 - Render frontend fallback: https://carfinding-web-free-hm.onrender.com (`srv-danek1qjnfac738cks1g`), still at `de177cf`.
 - `https://carfinding.ir/api/health/` returned HTTP 200, database `ok`, and Render release `098825fd3fa5`. The Mobin frontend returned HTTP 200. Admin GET and an invalid admin POST with a valid CSRF token also worked through the proxy.
+- On 2026-09-20, the Mobin-to-Render API proxy produced intermittent 502s. The API now goes through the deployed Supabase `render-proxy` Edge Function; ten consecutive invalid-login requests through `carfinding.ir` returned the expected HTTP 401, and the JWT header reached Django.
 - Both services use the existing Supabase PostgreSQL database. Django migrations through `searches.0003_searchprofile_multi_models_trims` are applied.
 
 ## Telegram and crawling
 
 - The Telegram bot webhook points to `https://carfinding-api-free-hm.onrender.com/api/telegram/webhook/`. `getWebhookInfo` confirmed that URL, zero pending updates, and no last error at deployment time.
 - The Supabase Edge Function `trigger-crawl` has `BACKEND_URL` and `CRON_SECRET` set for the new API. A test invocation through the existing pg_cron path returned HTTP 200 and `{"status":"ok","profiles_crawled":1}`. The hourly Supabase job remains active at minute 30 UTC.
-- The `carfinding-beat`, `carfinding-worker`, `carfinding-backend`, and `carfinding-redis` containers on `mobin-vps` are stopped. Only the frontend container and Caddy serve `carfinding.ir`; API, admin, and static backend requests are proxied to Render.
+- The `carfinding-beat`, `carfinding-worker`, `carfinding-backend`, and `carfinding-redis` containers on `mobin-vps` are stopped. Only the frontend container and Caddy serve `carfinding.ir`; API requests go through Supabase to Render, while admin and static backend requests use Render ingress IPs.
 - The Mobin network cannot reach Telegram. This was confirmed by failed requests to Telegram's API from the VPS; the new Render/Supabase path replaces it.
 - Code in `de177cf` retries up to five recent unsent matches per search during a crawl once the user's Telegram connection is verified. The retry window is seven days; notifications already sent are skipped, and failed notifications stop after three attempts. Crawls stuck in `running` for more than 15 minutes are marked failed so a new run can start.
 
@@ -41,6 +42,6 @@ Updated: 2026-09-20 (Asia/Tehran)
 
 - The older Render services named `divar-car-finder-api` and `divar-car-finder-web` are in a different, inaccessible Render workspace. Do not confuse their URLs with the new deployment.
 - `DEPLOY_FREE.md` describes the Render + Supabase architecture but still refers to the older Render service names.
-- The Mobin DNS resolver returns `10.10.34.36` for the Render hostname. The Caddy proxy uses two public Render ingress IPs with TLS verification and failover. Check these IPs if the API proxy later fails; see `deploy/mobin/README.md`.
+- The Mobin DNS resolver returns `10.10.34.36` for the Render hostname. Direct Mobin-to-Render requests through public IPs were also unreliable, so only admin and static backend paths use those IPs. See `deploy/mobin/README.md` for the Supabase relay and its shared secret file.
 - Render CLI is authenticated in the current workspace. Check releases with `render deploys list srv-danejtegekts738nmt30 --output json` and `render deploys list srv-danek1qjnfac738cks1g --output json`.
 - Never commit `backend/.env`, bot tokens, database credentials, cron secrets, or tokenized Telegram API URLs. The temporary local cron-secret file used during cutover was removed.

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -19,6 +20,27 @@ const highlights = [
   { icon: ShieldCheck, title: 'امن و خصوصی', text: 'اطلاعات جستجوی شما محرمانه و تنها در اختیار خودتان است.' },
 ];
 
+const isConnectionFailure = (error: unknown) =>
+  axios.isAxiosError(error) &&
+  (!error.response || [502, 503, 504].includes(error.response.status));
+
+const loginWithRetry = async (email: string, password: string, attempt = 0): Promise<{ access: string; refresh: string }> => {
+  try {
+    const { data } = await api.post<{ access: string; refresh: string }>(
+      '/auth/login/',
+      { email, password },
+      { timeout: 25000 },
+    );
+    return data;
+  } catch (error) {
+    if (attempt < 2 && isConnectionFailure(error)) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      return loginWithRetry(email, password, attempt + 1);
+    }
+    throw error;
+  }
+};
+
 export default function LoginPage() {
   const nav = useNavigate();
   const [email, setEmail] = useState('');
@@ -32,12 +54,13 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login/', { email, password });
+      const data = await loginWithRetry(email, password);
       localStorage.setItem('access', data.access);
       localStorage.setItem('refresh', data.refresh);
       nav('/');
-    } catch {
-      setError('ایمیل یا رمز عبور درست نیست.');
+    } catch (error) {
+      const invalidCredentials = axios.isAxiosError(error) && [400, 401].includes(error.response?.status ?? 0);
+      setError(invalidCredentials ? 'ایمیل یا رمز عبور درست نیست.' : 'ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.');
     } finally {
       setLoading(false);
     }
